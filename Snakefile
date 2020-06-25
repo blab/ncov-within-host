@@ -67,7 +67,7 @@ rule call_snvs:
         > {output.vcf}
         '''
 
-rule validate_iSNVs:
+rule validate_snvs:
     message: 'Generating iSNVs for each sample'
     input:
         strains = 'data/sars-cov-2_batch_nwgc-id_strain.tsv',
@@ -82,4 +82,21 @@ rule validate_iSNVs:
         --sequences {input.sequences} \
         --vcf {input.vcfs} \
         --output {output.snvs}
+        '''
+rule plot_snvs_ct:
+    message: 'Plotting iSNVs vs. Ct'
+    input:
+        snvs = rules.validate_snvs.output.snvs,
+        metadata = 'data/SCAN_within-host-metadata_2020-06-13.tsv'
+    params:
+        maf = config['maf']
+    output:
+        plot = 'figures/ct-snvs.pdf'
+    shell:
+        '''
+        python scripts/plot_snvs-ct.py \
+        --snvs {input.snvs} \
+        --metadata {input.metadata} \
+        --maf {params.maf} \
+        --output {output.plot}
         '''

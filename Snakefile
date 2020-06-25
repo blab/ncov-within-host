@@ -41,8 +41,6 @@ rule filter:
             --output {output.sequences}
         '''
 
-
-
 def list_pileups(wildcards):
     return glob.glob('/fh/fast/bedford_t/seattleflu/assembly-ncov/*/process/mpileup/sars-cov-2/' + wildcards.sample +'.pileup')
 
@@ -83,6 +81,7 @@ rule validate_snvs:
         --vcf {input.vcfs} \
         --output {output.snvs}
         '''
+        
 rule plot_snvs_ct:
     message: 'Plotting iSNVs vs. Ct'
     input:

@@ -1,0 +1,138 @@
+'''
+In VCF files, SNVs are called relative to reference genome.
+This generates a json with iSNVs relative to sample genome.
+
+Inputs are:
+    --strain-id, a tsv file mapping strain to nwgc_id
+    --sequences, fasta with consensus genome for each sample
+    --vcfs, list of vcf files
+    --output, location of json storing iSNVs
+'''
+
+import argparse
+import pandas as pd
+from Bio import SeqIO
+import numpy as np
+import allel
+import json
+
+def strains_to_samples(tsv, fasta):
+    '''
+    Renames keys of dictionary of consensus genomes with nwgc_id.
+    Drops genomes without nwgc_id.
+    '''
+    with open(tsv) as tfile:
+        strain_df = pd.read_csv(tfile, sep = '\t', index_col = 'strain')
+
+    genomes = SeqIO.to_dict(SeqIO.parse(fasta, 'fasta'))
+    strains = [strain for strain in genomes.keys()]
+    keep = list(set(strains) & set(strain_df.index))
+    drop = list(set(strains).difference(strain_df.index))
+
+    for strain in keep:
+        nwgc_id = strain_df.at[strain, 'nwgc_id']
+        if isinstance(nwgc_id, np.ndarray): # Assumes that there is only duplicate sequencing of samples. If more, e.g. triplicate, modify code.
+            genomes[nwgc_id[0]] = genomes[strain]
+            genomes[nwgc_id[1]] = genomes.pop(strain)
+        else:
+            genomes[nwgc_id] = genomes.pop(strain)
+
+    for strain in drop:
+        genomes.pop(strain)
+        print(strain + " NOT in " + tsv)
+    return genomes
+
+def check_variants(mapping, nwgc_id, freq, vcf, genomes):
+    '''
+    Checks if SNVs based off reference genome are SNVs relative to sample consensus genome.
+    If so, adds SNVs to dictionary supplied by mapping.
+    '''
+    if nwgc_id not in mapping.keys():
+        mapping[nwgc_id] = {}
+    if freq not in mapping[nwgc_id].keys():
+        mapping[nwgc_id][freq] = {}
+        mapping[nwgc_id][freq]['position'] = []
+        mapping[nwgc_id][freq]['variant'] = []
+
+    if vcf is not None:
+        for i in range(len(vcf['variants/POS'])):
+            pos = int(vcf['variants/POS'][i])
+
+            if genomes[nwgc_id].seq[(pos-1)] == vcf['variants/REF'][i]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
+                if 0.1 <= (vcf['calldata/ADF'][i,0])/(vcf['calldata/AD'][i,0][0]) <= 0.9:
+                    mapping[nwgc_id][freq]['position'].append(pos)
+                    mapping[nwgc_id][freq]['variant'].append(vcf['variants/ALT'][i,0])
+
+            elif genomes[nwgc_id].seq[(pos-1)] == vcf['variants/ALT'][i,0]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
+                if vcf['calldata/RD'][i]/vcf['calldata/DP'][i] >= freq:
+                    if 0.1 <=(vcf['calldata/RDF'][i]/vcf['calldata/RD'][i]) <= 0.9:
+                        mapping[nwgc_id][freq]['position'].append(pos)
+                        mapping[nwgc_id][freq]['variant'].append(vcf['variants/REF'][i])
+
+            else:
+                if 0.1 <= vcf['calldata/RDF'][i]/vcf['calldata/RD'][i] <= 0.9 or 0.1 <= vcf['calldata/ADF'][i,0]/vcf['calldata/AD'][i,0][0] <= 0.9:
+                    print('\nCheck ' + str(nwgc_id) + '.vcf at maf = '+ str(freq) +'. Genome does not match reference or variant.')
+                    print('Position: ' + str(pos))
+                    print('Genome: '+ genomes[nwgc_id].seq[pos])
+                    print('Ref: ' + vcf['variants/REF'][i])
+                    print('Alt: ' + vcf['variants/ALT'][i,0])
+
+def create_snvs(vcfs, genomes):
+    '''
+    Creates dictionary containing SNVs for each vcf file.
+    '''
+    snvs = {}
+    for file in vcfs:
+        path_list = file.split('/')
+        freq = float(path_list[2].split('-')[1])
+        nwgc_id = int(path_list[3].split('.')[0])
+
+        if nwgc_id in genomes.keys():
+            vcf = allel.read_vcf(file, fields=['variants/POS',
+                                               'variants/REF',
+                                               'variants/ALT',
+                                               'calldata/DP',
+                                               'calldata/RD',
+                                               'calldata/AD',
+                                               'calldata/RDF',
+                                               'calldata/RDR',
+                                               'calldata/ADF',
+                                               'calldata/ADR'])
+            check_variants(snvs, nwgc_id, freq, vcf, genomes)
+        else:
+            print('For ' + file + ', sample is not in fasta and/or tsv.')
+    return snvs
+
+def add_total(snvs):
+    '''
+    Adds dictionary entry with total number of SNVs for each sample at each maf.
+    '''
+    for sample, dictionary in snvs.items():
+        for frequency in dictionary.keys():
+            snvs[sample][frequency]['total'] = len(snvs[sample][frequency]['position'])
+    return snvs
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description="Makes JSON of iSNVs",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument('--strain-id', type=str, required=True, help='tsv with sample names and nwgc_id')
+    parser.add_argument('--sequences', type=str, required=True, help = 'fasta file of consensus genomes')
+    parser.add_argument('--vcf', nargs = '+', type=str, required=True, help = 'directory containing vcf files')
+    parser.add_argument('--output', type=str, required=True, help = 'location of output json')
+    args = parser.parse_args()
+
+    # Loads dictionary of consensus genomes
+    genomes = strains_to_samples(args.strain_id, args.sequences)
+
+    # Makes dictionary of iSNVs
+    snvs = create_snvs(args.vcf, genomes)
+
+    # Adds entry to iSNVs dictionary
+    snvs_dict = add_total(snvs)
+
+    # Writes iSNVs to JSON
+    with open(args.output, 'wt') as f:
+        json.dump(snvs_dict, f, indent=1)

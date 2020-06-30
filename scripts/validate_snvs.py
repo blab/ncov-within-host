@@ -42,40 +42,56 @@ def strains_to_samples(tsv, fasta):
         print(strain + " NOT in " + tsv)
     return genomes
 
-def check_variants(mapping, nwgc_id, freq, vcf, genomes):
+def check_variants(file, nwgc_id, genomes):
     '''
-    Checks if SNVs based off reference genome are SNVs relative to sample consensus genome.
+    Opens vcf file and checks if SNVs based off reference genome are SNVs relative to sample consensus genome.
     If so, adds SNVs to dictionary supplied by mapping.
     '''
-    if nwgc_id not in mapping.keys():
-        mapping[nwgc_id] = {}
-    if freq not in mapping[nwgc_id].keys():
-        mapping[nwgc_id][freq] = {}
-        mapping[nwgc_id][freq]['position'] = []
-        mapping[nwgc_id][freq]['variant'] = []
+    mapping = {}
+    mapping['position'] = []
+    mapping['variant'] = []
+    mapping['coverage'] = []
+    mapping['frequency'] = []
+
+    vcf = allel.read_vcf(file, fields=['variants/POS',
+                                       'variants/REF',
+                                       'variants/ALT',
+                                       'calldata/DP',
+                                       'calldata/RD',
+                                       'calldata/AD',
+                                       'calldata/RDF',
+                                       'calldata/RDR',
+                                       'calldata/ADF',
+                                       'calldata/ADR'],
+                                       types={'calldata/DP': 'i4', 'calldata/AD':'i4'})
 
     if vcf is not None:
         for i in range(len(vcf['variants/POS'])):
             pos = int(vcf['variants/POS'][i])
 
             if genomes[nwgc_id].seq[(pos-1)] == vcf['variants/REF'][i]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
-                if 0.1 <= (vcf['calldata/ADF'][i,0])/(vcf['calldata/AD'][i,0][0]) <= 0.9:
-                    mapping[nwgc_id][freq]['position'].append(pos)
-                    mapping[nwgc_id][freq]['variant'].append(vcf['variants/ALT'][i,0])
+                if 0.1 <= (vcf['calldata/ADF'][i,0])/(vcf['calldata/AD'][i,0,0]) <= 0.9:
+                    mapping['position'].append(pos)
+                    mapping['variant'].append(vcf['variants/ALT'][i,0])
+                    mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
+                    mapping['frequency'].append(float(vcf['calldata/AD'][i,0,0]/vcf['calldata/DP'][i,0]))
 
             elif genomes[nwgc_id].seq[(pos-1)] == vcf['variants/ALT'][i,0]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
-                if vcf['calldata/RD'][i]/vcf['calldata/DP'][i] >= freq:
-                    if 0.1 <=(vcf['calldata/RDF'][i]/vcf['calldata/RD'][i]) <= 0.9:
-                        mapping[nwgc_id][freq]['position'].append(pos)
-                        mapping[nwgc_id][freq]['variant'].append(vcf['variants/REF'][i])
+                if (vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01:
+                    if 0.1 <= (vcf['calldata/RDF'][i,0])/(vcf['calldata/RD'][i,0]) <= 0.9:
+                        mapping['position'].append(pos)
+                        mapping['variant'].append(vcf['variants/REF'][i])
+                        mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
+                        mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/vcf['calldata/DP'][i,0]))
 
             else:
-                if 0.1 <= vcf['calldata/RDF'][i]/vcf['calldata/RD'][i] <= 0.9 or 0.1 <= vcf['calldata/ADF'][i,0]/vcf['calldata/AD'][i,0][0] <= 0.9:
-                    print('\nCheck ' + str(nwgc_id) + '.vcf at maf = '+ str(freq) +'. Genome does not match reference or variant.')
+                if 0.1 <= vcf['calldata/RDF'][i,0]/vcf['calldata/RD'][i,0] <= 0.9 or 0.1 <= vcf['calldata/ADF'][i,0]/vcf['calldata/AD'][i,0,0] <= 0.9:
+                    print('\nCheck ' + str(nwgc_id) + '.vcf. Genome does not match reference or variant.')
                     print('Position: ' + str(pos))
                     print('Genome: '+ genomes[nwgc_id].seq[pos])
                     print('Ref: ' + vcf['variants/REF'][i])
                     print('Alt: ' + vcf['variants/ALT'][i,0])
+    return mapping
 
 def create_snvs(vcfs, genomes):
     '''
@@ -84,21 +100,11 @@ def create_snvs(vcfs, genomes):
     snvs = {}
     for file in vcfs:
         path_list = file.split('/')
-        freq = float(path_list[2].split('-')[1])
-        nwgc_id = int(path_list[3].split('.')[0])
+        nwgc_id = int(path_list[2].split('.')[0])
 
         if nwgc_id in genomes.keys():
-            vcf = allel.read_vcf(file, fields=['variants/POS',
-                                               'variants/REF',
-                                               'variants/ALT',
-                                               'calldata/DP',
-                                               'calldata/RD',
-                                               'calldata/AD',
-                                               'calldata/RDF',
-                                               'calldata/RDR',
-                                               'calldata/ADF',
-                                               'calldata/ADR'])
-            check_variants(snvs, nwgc_id, freq, vcf, genomes)
+            snvs[nwgc_id] = {}
+            snvs[nwgc_id] = check_variants(file, nwgc_id, genomes)
         else:
             print('For ' + file + ', sample is not in fasta and/or tsv.')
     return snvs
@@ -107,9 +113,12 @@ def add_total(snvs):
     '''
     Adds dictionary entry with total number of SNVs for each sample at each maf.
     '''
-    for sample, dictionary in snvs.items():
-        for frequency in dictionary.keys():
-            snvs[sample][frequency]['total'] = len(snvs[sample][frequency]['position'])
+    for sample in snvs.keys():
+        snvs[sample]['total'] = {}
+        frequency = list(snvs[sample]['frequency'])
+        snvs[sample]['total']['mvf=0.01'] = len(snvs[sample]['position'])
+        snvs[sample]['total']['mvf=0.02'] = len([freq for freq in frequency if freq >= 0.02])
+        snvs[sample]['total']['mvf=0.05'] = len([freq for freq in frequency if freq >= 0.05])
     return snvs
 
 if __name__ == '__main__':

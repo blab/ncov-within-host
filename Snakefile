@@ -8,7 +8,7 @@ configfile: 'config/config.yaml'
 
 rule all:
     input:
-        isnvs = 'results/isnvs.json'
+        isnvs = 'results/snvs.json'
 
 rule download:
     message: 'Downloading metadata and fasta files from S3'
@@ -41,6 +41,19 @@ rule filter:
             --output {output.sequences}
         '''
 
+rule clean_metabase:
+    message: 'Cleaning metadata downloaded from Seattle Flu Metabase'
+    input:
+        metadata = 'data/preliminary/metadata_metabase.tsv'
+    output:
+        metadata = 'data/preliminary/metadata_metabase_clean.tsv'
+    shell:
+        '''
+        awk 'BEGIN{{FS=OFS="\t"}}{{split($3,a,"T"); print $2, a[1],$4,$6,$7,$8,$11}}' {input.metadata} \
+        | sed 's/avg_hcov19_crt/ct/; s/"//g' \
+        > {output.metadata}
+        '''
+
 def list_pileups(wildcards):
     return glob.glob('/fh/fast/bedford_t/seattleflu/assembly-ncov/*/process/mpileup/sars-cov-2/' + wildcards.sample +'.pileup')
 
@@ -52,14 +65,15 @@ rule call_snvs:
         vcf = 'data/vcf/maf-{freq}/{sample}.vcf'
     params:
         min_cov = 100,
-        phred = 30
+        phred = 30,
+        min_var_freq = 0.01
     shell:
         '''
         varscan mpileup2snp \
         {input.pileup} \
         --min-coverage {params.min_cov} \
         --min-avg-qual {params.phred} \
-        --min-var-freq {wildcards.freq} \
+        --min-var-freq {params.min_var_freq} \
         --strand-filter 1 \
         --output-vcf 1 \
         > {output.vcf}
@@ -70,9 +84,9 @@ rule validate_snvs:
     input:
         strains = 'data/sars-cov-2_batch_nwgc-id_strain.tsv',
         sequences = rules.filter.output.sequences,
-        vcfs = expand('data/vcf/maf-{freq}/{sample}.vcf', sample=config['samples'], freq=config['maf'])
+        vcfs = expand('data/vcf/{sample}.vcf', sample=config['samples'])
     output:
-        snvs = 'results/isnvs.json'
+        snvs = 'results/snvs.json'
     shell:
         '''
         python scripts/validate_snvs.py \
@@ -81,21 +95,18 @@ rule validate_snvs:
         --vcf {input.vcfs} \
         --output {output.snvs}
         '''
-        
+
 rule plot_snvs_ct:
     message: 'Plotting iSNVs vs. Ct'
     input:
         snvs = rules.validate_snvs.output.snvs,
         metadata = 'data/SCAN_within-host-metadata_2020-06-13.tsv'
-    params:
-        maf = config['maf']
     output:
         plot = 'figures/ct-snvs.pdf'
     shell:
         '''
-        python scripts/plot_snvs-ct.py \
+        python scripts/plot_snvs_ct.py \
         --snvs {input.snvs} \
         --metadata {input.metadata} \
-        --maf {params.maf} \
         --output {output.plot}
         '''

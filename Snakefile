@@ -41,18 +41,18 @@ rule filter:
             --output {output.sequences}
         '''
 
-rule clean_metabase:
-    message: 'Cleaning metadata downloaded from Seattle Flu Metabase'
-    input:
-        metadata = 'data/preliminary/metadata_metabase.tsv'
-    output:
-        metadata = 'data/preliminary/metadata_metabase_clean.tsv'
-    shell:
-        '''
-        awk 'BEGIN{{FS=OFS="\t"}}{{split($3,a,"T"); print $2, a[1],$4,$6,$7,$8,$11}}' {input.metadata} \
-        | sed 's/avg_hcov19_crt/ct/; s/"//g' \
-        > {output.metadata}
-        '''
+#rule clean_metabase: Will add in when I sort through all the rest of concating metadata rules
+#    message: 'Cleaning metadata downloaded from Seattle Flu Metabase'
+#    input:
+#        metadata = 'data/preliminary/metadata_metabase.tsv'
+#    output:
+#        metadata = 'data/preliminary/metadata_metabase_clean.tsv'
+#    shell:
+#        '''
+#        awk 'BEGIN{{FS=OFS="\t"}}{{split($3,a,"T"); print $2, a[1],$4,$6,$7,$8,$11}}' {input.metadata} \
+#        | sed 's/avg_hcov19_crt/ct/; s/"//g' \
+#        > {output.metadata}
+#        '''
 
 def list_pileups(wildcards):
     return glob.glob('/fh/fast/bedford_t/seattleflu/assembly-ncov/*/process/mpileup/sars-cov-2/' + wildcards.sample +'.pileup')

@@ -22,15 +22,15 @@ def strains_to_samples(tsv, fasta):
     Drops genomes without nwgc_id.
     '''
     with open(tsv) as tfile:
-        strain_df = pd.read_csv(tfile, sep = '\t', index_col = 'strain')
+        metadata = pd.read_csv(tfile, sep = '\t', index_col = 'strain')
 
     genomes = SeqIO.to_dict(SeqIO.parse(fasta, 'fasta'))
     strains = [strain for strain in genomes.keys()]
-    keep = list(set(strains) & set(strain_df.index))
-    drop = list(set(strains).difference(strain_df.index))
+    keep = list(set(strains) & set(metadata.index))
+    drop = list(set(strains).difference(metadata.index))
 
     for strain in keep:
-        nwgc_id = strain_df.at[strain, 'nwgc_id']
+        nwgc_id = metadata.at[strain, 'nwgc_id']
         if isinstance(nwgc_id, np.ndarray): # Assumes that there is only duplicate sequencing of samples. If more, e.g. triplicate, modify code.
             genomes[nwgc_id[0]] = genomes[strain]
             genomes[nwgc_id[1]] = genomes.pop(strain)
@@ -127,14 +127,14 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
-    parser.add_argument('--strain-id', type=str, required=True, help='tsv with sample names and nwgc_id')
+    parser.add_argument('--metadata', type=str, required=True, help='tsv with sample names and nwgc_id')
     parser.add_argument('--sequences', type=str, required=True, help = 'fasta file of consensus genomes')
     parser.add_argument('--vcf', nargs = '+', type=str, required=True, help = 'directory containing vcf files')
     parser.add_argument('--output', type=str, required=True, help = 'location of output json')
     args = parser.parse_args()
 
     # Loads dictionary of consensus genomes
-    genomes = strains_to_samples(args.strain_id, args.sequences)
+    genomes = strains_to_samples(args.metadata, args.sequences)
 
     # Makes dictionary of iSNVs
     snvs = create_snvs(args.vcf, genomes)

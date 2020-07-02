@@ -17,7 +17,7 @@ rule download:
         metadata = 'data/preliminary/metadata_global.tsv'
     shell:
         '''
-        aws s3 cp s3://nextstrain-ncov-private/metadata.tsv.gz - | gunzip -cq >{output.metadata}
+        aws s3 cp s3://nextstrain-ncov-private/metadata.tsv.gz - | gunzip -cq > {output.metadata}
         aws s3 cp s3://nextstrain-ncov-private/sequences.fasta.gz - | gunzip -cq > {output.sequences}
         '''
 
@@ -41,18 +41,53 @@ rule filter:
             --output {output.sequences}
         '''
 
-#rule clean_metabase: Will add in when I sort through all the rest of concating metadata rules
-#    message: 'Cleaning metadata downloaded from Seattle Flu Metabase'
-#    input:
-#        metadata = 'data/preliminary/metadata_metabase.tsv'
-#    output:
-#        metadata = 'data/preliminary/metadata_metabase_clean.tsv'
-#    shell:
-#        '''
-#        awk 'BEGIN{{FS=OFS="\t"}}{{split($3,a,"T"); print $2, a[1],$4,$6,$7,$8,$11}}' {input.metadata} \
-#        | sed 's/avg_hcov19_crt/ct/; s/"//g' \
-#        > {output.metadata}
-#        '''
+rule clean_metabase:
+    message: 'Cleaning metadata downloaded from Seattle Flu Metabase'
+    input:
+        metadata = 'data/preliminary/metadata_metabase.tsv'
+    output:
+        metadata = 'data/preliminary/metadata_metabase_clean.tsv'
+    shell:
+        '''
+        awk 'BEGIN{{FS=OFS="\t"}}{{print $2,$4,$6,$7,$8,$11}}' {input.metadata} \
+        | sed 's/avg_hcov19_crt/avg_ct/; s/"//g; s/\]//g; s/\[//g' \
+        > {output.metadata}
+        '''
+
+def list_wadoh(wildcards):
+    return glob.glob('data/preliminary/wadoh_metadata/*.txt')
+
+rule clean_wadoh:
+    message: 'Cleaning and compiling WA-DoH metadata'
+    input:
+        metadata = list_wadoh
+    output:
+        metadata = 'data/preliminary/metadata_wadoh_clean.tsv'
+    shell:
+        '''
+        python scripts/clean_wadoh_metadata.py \
+        --metadata {input.metadata} \
+        --output {output.metadata}
+        '''
+
+rule concat_metadata:
+    message: 'Combining Metabase, WA-DoH, and strains metadata'
+    input:
+        strains = '/fh/fast/bedford_t/seattleflu/aspera-data-backup/Flu/hcov19-batch-nwgc-id-strain.csv',
+        wadoh = rules.clean_wadoh.output.metadata,
+        global_metadata = rules.download.output.metadata,
+        metabase = rules.clean_metabase.output.metadata
+    output:
+        metadata = 'data/metadata.tsv'
+    shell:
+        '''
+        python scripts/concat_metadata.py \
+        --strains {input.strains} \
+        --wadoh {input.wadoh} \
+        --global-metadata {input.global_metadata} \
+        --metabase {input.metabase} \
+        --output {output.metadata}
+        '''
 
 def list_pileups(wildcards):
     return glob.glob('/fh/fast/bedford_t/seattleflu/assembly-ncov/*/process/mpileup/sars-cov-2/' + wildcards.sample +'.pileup')
@@ -62,7 +97,7 @@ rule call_snvs:
     input:
         pileup = list_pileups
     output:
-        vcf = 'data/vcf/maf-{freq}/{sample}.vcf'
+        vcf = 'data/vcf/{sample}.vcf'
     params:
         min_cov = 100,
         phred = 30,
@@ -82,7 +117,7 @@ rule call_snvs:
 rule validate_snvs:
     message: 'Generating iSNVs for each sample'
     input:
-        strains = 'data/sars-cov-2_batch_nwgc-id_strain.tsv',
+        metadata = rules.concat_metadata.output.metadata,
         sequences = rules.filter.output.sequences,
         vcfs = expand('data/vcf/{sample}.vcf', sample=config['samples'])
     output:
@@ -90,7 +125,7 @@ rule validate_snvs:
     shell:
         '''
         python scripts/validate_snvs.py \
-        --strain-id {input.strains} \
+        --metadata {input.metadata} \
         --sequences {input.sequences} \
         --vcf {input.vcfs} \
         --output {output.snvs}
@@ -100,7 +135,7 @@ rule plot_snvs_ct:
     message: 'Plotting iSNVs vs. Ct'
     input:
         snvs = rules.validate_snvs.output.snvs,
-        metadata = 'data/SCAN_within-host-metadata_2020-06-13.tsv'
+        metadata = rules.concat_metadata.output.metadata
     output:
         plot = 'figures/ct-snvs.pdf'
     shell:

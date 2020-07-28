@@ -88,7 +88,7 @@ def check_variants(file, nwgc_id, genomes):
                 if 0.1 <= vcf['calldata/RDF'][i,0]/vcf['calldata/RD'][i,0] <= 0.9 or 0.1 <= vcf['calldata/ADF'][i,0]/vcf['calldata/AD'][i,0,0] <= 0.9:
                     print('\nCheck ' + str(nwgc_id) + '.vcf. Genome does not match reference or variant.')
                     print('Position: ' + str(pos))
-                    print('Genome: '+ genomes[nwgc_id].seq[pos])
+                    print('Genome: '+ genomes[nwgc_id].seq[pos-1])
                     print('Ref: ' + vcf['variants/REF'][i])
                     print('Alt: ' + vcf['variants/ALT'][i,0])
     return mapping
@@ -105,8 +105,8 @@ def create_snvs(vcfs, genomes):
         if nwgc_id in genomes.keys():
             snvs[nwgc_id] = {}
             snvs[nwgc_id] = check_variants(file, nwgc_id, genomes)
-        else:
-            print('For ' + file + ', sample is not in fasta and/or tsv.')
+    #    else:
+    #        print('For ' + file + ', sample is not in fasta and/or tsv.')
     return snvs
 
 def add_total(snvs):

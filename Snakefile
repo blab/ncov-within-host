@@ -4,17 +4,17 @@ It will likely be expanded to do a lot more in future.
 '''
 import glob
 
-configfile: 'config/config.yaml'
+SAMPLES = glob_wildcards('/fh/fast/bedford_t/seattleflu/assembly-ncov/{batch}/process/mpileup/sars-cov-2/{sample}.pileup').sample
 
 rule all:
     input:
-        isnvs = 'results/snvs.json'
+        snvs_df = 'results/snvs.json'
 
 rule download:
     message: 'Downloading metadata and fasta files from S3'
     output:
-        sequences = 'data/preliminary/sequences_global.fasta',
-        metadata = 'data/preliminary/metadata_global.tsv'
+        sequences = 'data/sequences_global.fasta',
+        metadata = 'data/metadata_global.tsv'
     shell:
         '''
         aws s3 cp s3://nextstrain-ncov-private/metadata.tsv.gz - | gunzip -cq > {output.metadata}
@@ -27,10 +27,11 @@ rule filter:
         sequences = rules.download.output.sequences,
         metadata = rules.download.output.metadata
     output:
-        sequences = 'data/genomes.fasta'
+        sequences = 'results/genomes.fasta'
     params:
         min_length = 25000,
-        exclude_where = 'submitting_lab!="Seattle Flu Study"'
+        exclude_where = 'submitting_lab!="Seattle Flu Study"',
+        include_where = 'submitting_lab="Seattle Flu Study, University of Washington Medical Center"'
     shell:
         '''
         augur filter \
@@ -38,15 +39,34 @@ rule filter:
             --metadata {input.metadata} \
             --min-length {params.min_length} \
             --exclude-where {params.exclude_where} \
+            --include-where {params.include_where} \
             --output {output.sequences}
+        '''
+
+rule align:
+    message: 'Aligning sequences to Wuhan/Hu-1/2019'
+    input:
+        sequences = rules.filter.output.sequences,
+        reference = 'config/sars-cov-2.fasta'
+    output:
+        sequences = 'results/aligned.fasta'
+    shell:
+        '''
+        augur align \
+        --sequences {input.sequences} \
+        --reference-sequence {input.reference} \
+        --remove-reference \
+        --output {output.sequences} \
+        --remove-reference \
+        --nthreads 4
         '''
 
 rule clean_metabase:
     message: 'Cleaning metadata downloaded from Seattle Flu Metabase'
     input:
-        metadata = 'data/preliminary/metadata_metabase.tsv'
+        metadata = 'data/metadata_metabase.tsv'
     output:
-        metadata = 'data/preliminary/metadata_metabase_clean.tsv'
+        metadata = 'data/metadata_metabase_clean.tsv'
     shell:
         '''
         awk 'BEGIN{{FS=OFS="\t"}}{{print $2,$4,$6,$7,$8,$11}}' {input.metadata} \
@@ -55,14 +75,14 @@ rule clean_metabase:
         '''
 
 def list_wadoh(wildcards):
-    return glob.glob('data/preliminary/wadoh_metadata/*.txt')
+    return glob.glob('data/wadoh_metadata/*.txt')
 
 rule clean_wadoh:
     message: 'Cleaning and compiling WA-DoH metadata'
     input:
         metadata = list_wadoh
     output:
-        metadata = 'data/preliminary/metadata_wadoh_clean.tsv'
+        metadata = 'data/metadata_wadoh_clean.tsv'
     shell:
         '''
         python scripts/clean_wadoh_metadata.py \
@@ -78,7 +98,7 @@ rule concat_metadata:
         global_metadata = rules.download.output.metadata,
         metabase = rules.clean_metabase.output.metadata
     output:
-        metadata = 'data/metadata.tsv'
+        metadata = 'results/metadata.tsv'
     shell:
         '''
         python scripts/concat_metadata.py \
@@ -97,7 +117,7 @@ rule call_snvs:
     input:
         pileup = list_pileups
     output:
-        vcf = 'data/vcf/{sample}.vcf'
+        vcf = 'results/vcf/{sample}.vcf'
     params:
         min_cov = 100,
         phred = 30,
@@ -118,8 +138,8 @@ rule validate_snvs:
     message: 'Generating iSNVs for each sample'
     input:
         metadata = rules.concat_metadata.output.metadata,
-        sequences = rules.filter.output.sequences,
-        vcfs = expand('data/vcf/{sample}.vcf', sample=config['samples'])
+        sequences = rules.align.output.sequences,
+        vcfs = expand('results/vcf/{sample}.vcf', sample=SAMPLES)
     output:
         snvs = 'results/snvs.json'
     shell:
@@ -131,17 +151,82 @@ rule validate_snvs:
         --output {output.snvs}
         '''
 
-rule plot_snvs_ct:
-    message: 'Plotting iSNVs vs. Ct'
+#rule plot_snvs_ct:
+#    message: 'Plotting iSNVs vs. Ct'
+#    input:
+#        snvs = rules.validate_snvs.output.snvs,
+#        metadata = rules.concat_metadata.output.metadata
+#    output:
+#        plot = 'figures/ct-snvs.pdf'
+#    shell:
+#        '''
+#        python scripts/plot_snvs_ct.py \
+#        --snvs {input.snvs} \
+#        --metadata {input.metadata} \
+#        --output {output.plot}
+#        '''
+
+#rule plot_freq_ct:
+#    message: 'Plotting frequency of iSNVs for SCAN samples colored by Ct'
+#    input:
+#        snvs = rules.validate_snvs.output.snvs,
+#        metadata = rules.concat_metadata.output.metadata
+#    output:
+#        plot = 'figures/ct-freq-SCAN.pdf'
+#    shell:
+#        '''
+#        python scripts/plot_freq_ct.py \
+#        --snvs {input.snvs} \
+#        --metadata {input.metadata} \
+#        --output {output.plot}
+#        '''
+
+#rule plot_snvs_freq_ct:
+#    message: 'Plotting total and frequency of iSNVs vs. Ct for SCAN samples'
+#    input:
+#        snvs = rules.validate_snvs.output.snvs,
+#        metadata = rules.concat_metadata.output.metadata
+#    output:
+#        plot = 'figures/ct-snvs-freq-SCAN.pdf'
+#    shell:
+#        '''
+#        python scripts/plot_snvs_freq_ct.py \
+#        --snvs {input.snvs} \
+#        --metadata {input.metadata} \
+#        --output {output.plot}
+#        '''
+
+rule choose_duplicates:
+    message: 'Choosing samples to sequence in duplicate'
     input:
-        snvs = rules.validate_snvs.output.snvs,
-        metadata = rules.concat_metadata.output.metadata
+        metadata = rules.concat_metadata.output.metadata,
+        snvs = rules.validate_snvs.output.snvs
     output:
-        plot = 'figures/ct-snvs.pdf'
+        duplicates = 'results/to_duplicate.tsv'
     shell:
         '''
-        python scripts/plot_snvs_ct.py \
-        --snvs {input.snvs} \
+        python scripts/choose_duplicates.py \
         --metadata {input.metadata} \
-        --output {output.plot}
+        --snvs {input.snvs} \
+        --output {output.duplicates}
         '''
+
+#rule create_snvs_df:
+#    message: 'Saves DF containing all SNVs specified by params.origin & params.ct_cutoff'
+#    input:
+#        metadata = 'data/metadata.tsv',
+#        snvs = 'results/snvs.json'
+#    output:
+#        snvs = 'results/snvs_sfs.tsv'
+#    params:
+#        origin = 'sfs',
+#        ct_cutoff = 22
+#    shell:
+#        '''
+#        python scripts/create_snvs_df.py \
+#        --metadata {input.metadata} \
+#        --snvs {input.snvs} \
+#        --origin {params.origin} \
+#        --ct-cutoff {params.ct_cutoff} \
+#        --output {output.snvs}
+#        '''

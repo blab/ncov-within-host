@@ -28,7 +28,12 @@ def clean(file):
     df2 = df1.dropna(subset=['nwgc_id'])
     df3 = df2.astype({'nwgc_id': 'int32'})
     df4 = df3.dropna(thresh=2)
-    return df4
+    df5 = df4.loc[df4.primers.isna(), :]
+    df6 = df4.loc[df4.primers.notna(), :]
+    df5.set_index('nwgc_id', inplace=True)
+    df6.set_index('nwgc_id', inplace=True)
+    df7 = df5.combine_first(df6).reset_index()
+    return df7
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

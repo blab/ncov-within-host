@@ -27,6 +27,7 @@ def clean(df):
     df = df.drop(columns = ['sex', 'collection_date', 'county'])
     df = df.dropna(subset=['nwgc_id'])
     df = df.astype({'nwgc_id': 'int32'})
+    df = df.reset_index(drop=True)
     return df
 
 def dedup(df):

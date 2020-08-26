@@ -3,7 +3,7 @@ In VCF files, SNVs are called relative to reference genome.
 This generates a json with iSNVs relative to sample genome.
 
 Inputs are:
-    --strain-id, a tsv file mapping strain to nwgc_id
+    --metadata, a tsv file mapping strain to nwgc_id
     --sequences, fasta with consensus genome for each sample
     --vcfs, list of vcf files
     --output, location of json storing iSNVs
@@ -106,7 +106,7 @@ def create_snvs(vcfs, genomes):
             snvs[nwgc_id] = {}
             snvs[nwgc_id] = check_variants(file, nwgc_id, genomes)
     #    else:
-    #        print('For ' + file + ', sample is not in fasta and/or tsv.')
+    #        print('For ' + file + ', sample is not in fasta.')
     return snvs
 
 def add_total(snvs):
@@ -114,11 +114,7 @@ def add_total(snvs):
     Adds dictionary entry with total number of SNVs for each sample at each maf.
     '''
     for sample in snvs.keys():
-        snvs[sample]['total'] = {}
-        frequency = list(snvs[sample]['frequency'])
-        snvs[sample]['total']['mvf=0.01'] = len(snvs[sample]['position'])
-        snvs[sample]['total']['mvf=0.02'] = len([freq for freq in frequency if freq >= 0.02])
-        snvs[sample]['total']['mvf=0.05'] = len([freq for freq in frequency if freq >= 0.05])
+        snvs[sample]['total'] = len(snvs[sample]['position'])
     return snvs
 
 if __name__ == '__main__':

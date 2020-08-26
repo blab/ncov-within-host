@@ -2,9 +2,9 @@
 To start, this pipeline calls minor allele variants from pileup files for SARS-CoV-2.
 It will likely be expanded to do a lot more in future.
 '''
-import glob
+configfile: "config/config.yaml"
 
-SAMPLES = glob_wildcards('/fh/fast/bedford_t/seattleflu/assembly-ncov/{batch}/process/mpileup/sars-cov-2/{sample}.pileup').sample
+import glob
 
 rule all:
     input:
@@ -139,7 +139,7 @@ rule validate_snvs:
     input:
         metadata = rules.concat_metadata.output.metadata,
         sequences = rules.align.output.sequences,
-        vcfs = expand('results/vcf/{sample}.vcf', sample=SAMPLES)
+        vcfs = expand('results/vcf/{sample}.vcf', sample=config['samples'])
     output:
         snvs = 'results/snvs.json'
     shell:
@@ -149,66 +149,6 @@ rule validate_snvs:
         --sequences {input.sequences} \
         --vcf {input.vcfs} \
         --output {output.snvs}
-        '''
-
-#rule plot_snvs_ct:
-#    message: 'Plotting iSNVs vs. Ct'
-#    input:
-#        snvs = rules.validate_snvs.output.snvs,
-#        metadata = rules.concat_metadata.output.metadata
-#    output:
-#        plot = 'figures/ct-snvs.pdf'
-#    shell:
-#        '''
-#        python scripts/plot_snvs_ct.py \
-#        --snvs {input.snvs} \
-#        --metadata {input.metadata} \
-#        --output {output.plot}
-#        '''
-
-#rule plot_freq_ct:
-#    message: 'Plotting frequency of iSNVs for SCAN samples colored by Ct'
-#    input:
-#        snvs = rules.validate_snvs.output.snvs,
-#        metadata = rules.concat_metadata.output.metadata
-#    output:
-#        plot = 'figures/ct-freq-SCAN.pdf'
-#    shell:
-#        '''
-#        python scripts/plot_freq_ct.py \
-#        --snvs {input.snvs} \
-#        --metadata {input.metadata} \
-#        --output {output.plot}
-#        '''
-
-#rule plot_snvs_freq_ct:
-#    message: 'Plotting total and frequency of iSNVs vs. Ct for SCAN samples'
-#    input:
-#        snvs = rules.validate_snvs.output.snvs,
-#        metadata = rules.concat_metadata.output.metadata
-#    output:
-#        plot = 'figures/ct-snvs-freq-SCAN.pdf'
-#    shell:
-#        '''
-#        python scripts/plot_snvs_freq_ct.py \
-#        --snvs {input.snvs} \
-#        --metadata {input.metadata} \
-#        --output {output.plot}
-#        '''
-
-rule choose_duplicates:
-    message: 'Choosing samples to sequence in duplicate'
-    input:
-        metadata = rules.concat_metadata.output.metadata,
-        snvs = rules.validate_snvs.output.snvs
-    output:
-        duplicates = 'results/to_duplicate.tsv'
-    shell:
-        '''
-        python scripts/choose_duplicates.py \
-        --metadata {input.metadata} \
-        --snvs {input.snvs} \
-        --output {output.duplicates}
         '''
 
 #rule create_snvs_df:

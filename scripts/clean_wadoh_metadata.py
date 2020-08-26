@@ -20,20 +20,24 @@ def merge(flist):
                 df = df.merge(metadata, how = 'outer')
     return df
 
-def clean(file):
+def clean(df):
     '''
     Cleans metadata
     '''
-    df1 = file.drop(columns = ['sex', 'investigator_id', 'collection_date', 'county'])
-    df2 = df1.dropna(subset=['nwgc_id'])
-    df3 = df2.astype({'nwgc_id': 'int32'})
-    df4 = df3.dropna(thresh=2)
-    df5 = df4.loc[df4.primers.isna(), :]
-    df6 = df4.loc[df4.primers.notna(), :]
-    df5.set_index('nwgc_id', inplace=True)
-    df6.set_index('nwgc_id', inplace=True)
-    df7 = df5.combine_first(df6).reset_index()
-    return df7
+    df = df.drop(columns = ['sex', 'collection_date', 'county'])
+    df = df.dropna(subset=['nwgc_id'])
+    df = df.astype({'nwgc_id': 'int32'})
+    return df
+
+def dedup(df):
+    df['duplicate'] = df.duplicated(subset=['nwgc_id'], keep=False)
+    for index, row in df.iterrows():
+        if row.duplicate == True:
+            duplicate = df.loc[(df.nwgc_id == row.nwgc_id) & (df.index != index), :]
+            df.iloc[index, :] = row.fillna(duplicate.iloc[0])
+    df.drop(columns=['duplicate'],axis=1, inplace=True)
+    df.drop_duplicates(inplace=True, ignore_index = True)
+    return df
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -46,11 +50,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Merge metadata
-    df = merge(args.metadata)
+    merged = merge(args.metadata)
 
     # Clean metadata
-    df_clean = clean(df)
+    cleaned = clean(merged)
+
+    # Coalesce duplicate rows
+    deduped = dedup(cleaned)
 
     # Write out metadata
     with open(args.output, 'w') as f:
-        df_clean.to_csv(f, sep = '\t', index=False)
+        deduped.to_csv(f, sep = '\t', index=False)

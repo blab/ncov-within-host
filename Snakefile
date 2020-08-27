@@ -69,7 +69,7 @@ rule clean_metabase:
         metadata = 'data/metadata_metabase_clean.tsv'
     shell:
         '''
-        awk 'BEGIN{{FS=OFS="\t"}}{{print $2,$4,$6,$7,$8,$11}}' {input.metadata} \
+        awk 'BEGIN{{FS=OFS="\t"}}{{print $2,$4,$5,$7,$8,$9,$12}}' {input.metadata} \
         | sed 's/avg_hcov19_crt/avg_ct/; s/"//g; s/\]//g; s/\[//g' \
         > {output.metadata}
         '''

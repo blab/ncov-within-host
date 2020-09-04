@@ -4,6 +4,7 @@ Combines metadata from GISAID, Metabase, WA-DoH, and the strain-to-nwgc-id file.
 
 import argparse
 import pandas as pd
+from Bio import SeqIO
 
 def load_metadata(file, sep):
     '''
@@ -50,6 +51,15 @@ def merge_metabase(df, metadata):
                 df.loc[i, ['individual_identifier', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']] = metadata.loc[j, ['individual_identifier', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']]
     return df
 
+def filter_metadata(fasta, df):
+    '''
+    Removes samples from metadata not in fasta file.
+    '''
+    genomes = SeqIO.to_dict(SeqIO.parse(fasta, 'fasta'))
+    strains = [strain for strain in list(df['strain']) if strain not in genomes]
+    filtered = df[~df.strain.isin(strains)]
+    return filtered
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Makes JSON of iSNVs",
@@ -60,6 +70,7 @@ if __name__ == '__main__':
     parser.add_argument('--wadoh', type=str, required=True, help = 'WA-DoH metadata')
     parser.add_argument('--global-metadata', type=str, required=True, help = 'global metadata')
     parser.add_argument('--metabase', type=str, required=True, help = 'Metabase metadata')
+    parser.add_argument('--genomes', type=str, required=True, help = 'Fasta')
     parser.add_argument('--output', type=str, required=True, help = 'location of output tsv')
     args = parser.parse_args()
 
@@ -77,7 +88,8 @@ if __name__ == '__main__':
     dfA = merge(strains_prepped, wadoh, 'nwgc_id')
     dfB = merge(dfA, global_prepped, 'strain')
     dfC = merge_metabase(dfB, metabase)
+    dfD = filter_metadata(args.genomes, dfC)
 
     # Save final df
     with open(args.output, 'w') as f:
-        dfC.to_csv(f, sep = '\t', index=False)
+        dfD.to_csv(f, sep = '\t', index=False)

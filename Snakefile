@@ -91,12 +91,13 @@ rule clean_wadoh:
         '''
 
 rule concat_metadata:
-    message: 'Combining Metabase, WA-DoH, and strains metadata'
+    message: 'Combining Metabase, WA-DoH, and strains metadata & filtering to genomes'
     input:
         strains = '/fh/fast/bedford_t/seattleflu/aspera-data-backup/Flu/hcov19-batch-nwgc-id-strain.csv',
         wadoh = rules.clean_wadoh.output.metadata,
         global_metadata = rules.download.output.metadata,
-        metabase = rules.clean_metabase.output.metadata
+        metabase = rules.clean_metabase.output.metadata,
+        genomes = rules.align.output.sequences
     output:
         metadata = 'results/metadata.tsv'
     shell:
@@ -106,6 +107,7 @@ rule concat_metadata:
         --wadoh {input.wadoh} \
         --global-metadata {input.global_metadata} \
         --metabase {input.metabase} \
+        --genomes {input.genomes} \
         --output {output.metadata}
         '''
 
@@ -151,22 +153,21 @@ rule validate_snvs:
         --output {output.snvs}
         '''
 
-#rule create_snvs_df:
-#    message: 'Saves DF containing all SNVs specified by params.origin & params.ct_cutoff'
-#    input:
-#        metadata = 'data/metadata.tsv',
-#        snvs = 'results/snvs.json'
-#    output:
-#        snvs = 'results/snvs_sfs.tsv'
-#    params:
-#        origin = 'sfs',
-#        ct_cutoff = 22
-#    shell:
-#        '''
-#        python scripts/create_snvs_df.py \
-#        --metadata {input.metadata} \
-#        --snvs {input.snvs} \
-#        --origin {params.origin} \
-#        --ct-cutoff {params.ct_cutoff} \
-#        --output {output.snvs}
-#        '''
+rule choose_random_pairs:
+    message: 'Saves DF containing all SNVs for pair study'
+    input:
+        metadata = rules.concat_metadata.output.metadata,
+        pairs = 'results/{origin}_household_pairs.tsv',
+        snvs = rules.validate_snvs.output.snvs
+
+    output:
+        pairs = 'results/metadata_{origin}_pairs.tsv'
+    shell:
+        '''
+        python scripts/choose_random_pairs.py \
+        --metadata {input.metadata} \
+        --pairs {input.pairs} \
+        --snvs {input.snvs} \
+        --origin {wildcards.origin} \
+        --output {output.pairs}
+        '''

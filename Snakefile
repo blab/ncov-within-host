@@ -154,12 +154,11 @@ rule validate_snvs:
         '''
 
 rule choose_random_pairs:
-    message: 'Saves DF containing all SNVs for pair study'
+    message: 'Chooses random pairs as control for given pairs'
     input:
         metadata = rules.concat_metadata.output.metadata,
         pairs = 'results/{origin}_household_pairs.tsv',
         snvs = rules.validate_snvs.output.snvs
-
     output:
         pairs = 'results/metadata_{origin}_pairs.tsv'
     shell:
@@ -170,4 +169,23 @@ rule choose_random_pairs:
         --snvs {input.snvs} \
         --origin {wildcards.origin} \
         --output {output.pairs}
+        '''
+
+rule construct_snvs_df:
+    message: 'Creates df with all SNVs + annotations for samples in given tsv'
+    input:
+        metadata = 'results/metadata_{origin}_pairs.tsv',
+        snvs = rules.validate_snvs.output.snvs,
+        sequences = rules.align.output.sequences,
+        reference = 'config/reference_seq.gb'
+    output:
+        snvs = 'results/snvs_{origin}_pairs.tsv'
+    shell:
+        '''
+        python scripts/create_snvs_df.py \
+        --metadata {input.metadata} \
+        --snvs {input.snvs} \
+        --sequences {input.sequences} \
+        --reference {input.reference} \
+        --output {output.snvs} 
         '''

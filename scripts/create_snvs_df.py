@@ -59,7 +59,8 @@ def create_snvs_df(metadata, snvs):
     df['position'] = positions
     df['variant'] = variants
     df['frequency'] = frequencies
-    metadata = metadata.drop(['n_snvs'], axis=1)
+    if 'n_snvs' in metadata.columns:
+        metadata = metadata.drop(['n_snvs'], axis=1)
     df = df.merge(metadata, on='nwgc_id', how='left')
     return df
 

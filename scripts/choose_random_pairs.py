@@ -18,6 +18,7 @@ def load_metadata(file):
         df['nwgc_id'] = df.nwgc_id.astype('str')
         if 'origin' in df.columns:
             df.loc[df.origin=='sfs', 'origin'] = 'scan'
+        df = df.sort_values(by=['address_identifier'], axis=0, ignore_index=True)
     return df
 
 def load_snvs(file):
@@ -28,15 +29,6 @@ def load_snvs(file):
         snvs = json.load(jfile)
     return snvs
 
-def label_pairs(df):
-    '''
-    Adds pair type & numbers pairs in pairs.
-    '''
-    n_pairs = int(len(df)/2)
-    df['pair'] = [pair for num in range(1, n_pairs + 1) for pair in [num]*2]
-    df['pair_type'] = 'household'
-    return df
-
 def add_variants(df, snvs):
     '''
     Adds total number of SNV's to dataframe.
@@ -45,6 +37,21 @@ def add_variants(df, snvs):
     for sample in df['nwgc_id']:
         n_snvs.append(snvs[sample]['total'])
     df['n_snvs'] = n_snvs
+    return df
+
+def check_variants(df):
+    if 0 in df['n_snvs']:
+        address = df.loc[df.n_snvs == 0, 'address_identifier']
+        df = df[~df.address_identifier.isin(address)]
+    return df
+
+def label_pairs(df):
+    '''
+    Adds pair type & numbers pairs in pairs.
+    '''
+    n_pairs = int(len(df)/2)
+    df['pair'] = [pair for num in range(1, n_pairs + 1) for pair in [num]*2]
+    df['pair_type'] = 'household'
     return df
 
 def create_snvs_df(metadata, snvs):
@@ -78,7 +85,7 @@ def choose_random_pairs(metadata, pairs, origin):
     n_pairs = int(len(pairs)/2)
 
     filtered = metadata[(metadata.avg_ct <= max_ct) & (metadata.avg_ct >= min_ct) & (metadata.origin == origin) & (~metadata.nwgc_id.isin(ids))]
-    chosen = np.random.choice(filtered.nwgc_id, size = (7, 2), replace=False)
+    chosen = np.random.choice(filtered.nwgc_id, size = (n_pairs, 2), replace=False)
     chosen_list = chosen.flatten().tolist()
     df = metadata[metadata.nwgc_id.isin(chosen_list)]
     df = df.dropna(axis=1, how='all')
@@ -105,9 +112,12 @@ if __name__ == '__main__':
     pairs = load_metadata(args.pairs)
     snvs = load_snvs(args.snvs)
 
-    # Labels household pairs & adds # of variants
-    pairs = label_pairs(pairs)
+    # Adds # of variants & checks that all samples have >0 variants.
     pairs = add_variants(pairs, snvs)
+    pairs = check_variants(pairs)
+
+    # Labels pairs
+    pairs = label_pairs(pairs)
 
     # Creates snvs df for household pairs
     pairs_snvs = create_snvs_df(pairs, snvs)

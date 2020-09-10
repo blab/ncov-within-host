@@ -174,12 +174,12 @@ rule choose_random_pairs:
 rule construct_snvs_df:
     message: 'Creates df with all SNVs + annotations for samples in given tsv'
     input:
-        metadata = 'results/metadata_{origin}_pairs.tsv',
+        metadata = 'results/metadata_{origin}_{dataset}.tsv',
         snvs = rules.validate_snvs.output.snvs,
         sequences = rules.align.output.sequences,
         reference = 'config/reference_seq.gb'
     output:
-        snvs = 'results/snvs_{origin}_pairs.tsv'
+        snvs = 'results/snvs_{origin}_{dataset}.tsv'
     shell:
         '''
         python scripts/create_snvs_df.py \
@@ -187,5 +187,5 @@ rule construct_snvs_df:
         --snvs {input.snvs} \
         --sequences {input.sequences} \
         --reference {input.reference} \
-        --output {output.snvs} 
+        --output {output.snvs}
         '''

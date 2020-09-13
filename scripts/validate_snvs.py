@@ -24,20 +24,20 @@ def strains_to_samples(tsv, fasta):
     Drops genomes without nwgc_id.
     '''
     with open(tsv) as tfile:
-        metadata = pd.read_csv(tfile, sep = '\t', index_col = 'strain')
+        metadata = pd.read_csv(tfile, sep = '\t')
 
     genomes = SeqIO.to_dict(SeqIO.parse(fasta, 'fasta'))
     strains = [strain for strain in genomes.keys()]
-    keep = list(set(strains) & set(metadata.index))
-    drop = list(set(strains).difference(metadata.index))
+    keep = list(set(strains) & set(metadata['strain']))
+    drop = list(set(strains).difference(metadata['strain']))
 
     for strain in keep:
-        nwgc_id = metadata.at[strain, 'nwgc_id']
-        if isinstance(nwgc_id, np.ndarray): # Assumes that there is only duplicate sequencing of samples. If more, e.g. triplicate, modify code.
+        nwgc_id = metadata.loc[metadata.strain == strain, 'nwgc_id'].values
+        if len(nwgc_id) > 1: # Assumes that there is only duplicate sequencing of samples. If more, e.g. triplicate, modify code.
             genomes[nwgc_id[0]] = genomes[strain]
             genomes[nwgc_id[1]] = genomes.pop(strain)
         else:
-            genomes[nwgc_id] = genomes.pop(strain)
+            genomes[nwgc_id[0]] = genomes.pop(strain)
 
     for strain in drop:
         genomes.pop(strain)

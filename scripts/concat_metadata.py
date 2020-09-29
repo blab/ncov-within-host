@@ -41,6 +41,7 @@ def merge_metabase(df, metadata):
     Merges metabase df with other df.
     '''
     df['individual_identifier'] = ''
+    df['clia_barcode'] = ''
     df['age'] = ''
     df['puma'] = ''
     df['address_identifier'] = ''
@@ -48,7 +49,7 @@ def merge_metabase(df, metadata):
     for i in df.index:
         for j in metadata.index:
             if str(df.nwgc_id[i]) in metadata.nwgc_id[j]:
-                df.loc[i, ['individual_identifier', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']] = metadata.loc[j, ['individual_identifier', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']]
+                df.loc[i, ['individual_identifier', 'clia_barcode', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']] = metadata.loc[j, ['individual_identifier', 'clia_barcode', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']]
     return df
 
 def filter_metadata(fasta, df):

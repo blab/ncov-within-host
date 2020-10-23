@@ -48,16 +48,19 @@ def create_snvs_df(metadata, snvs):
     positions = []
     variants = []
     frequencies = []
+    coverage = []
     ids = []
     for sample in metadata['nwgc_id']:
         positions.extend(snvs[sample]['position'])
         variants.extend(snvs[sample]['variant'])
         frequencies.extend(snvs[sample]['frequency'])
+        coverage.extend(snvs[sample]['coverage'])
         ids.extend([sample]*len(snvs[sample]['position']))
     df = pd.DataFrame()
     df['nwgc_id'] = ids
     df['position'] = positions
     df['variant'] = variants
+    df['coverage'] = coverage
     df['frequency'] = frequencies
     if 'n_snvs' in metadata.columns:
         metadata = metadata.drop(['n_snvs'], axis=1)

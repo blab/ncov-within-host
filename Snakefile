@@ -126,12 +126,13 @@ rule call_snvs:
         min_var_freq = 0.01
     shell:
         '''
-        varscan mpileup2snp \
+        varscan mpileup2cns \
         {input.pileup} \
         --min-coverage {params.min_cov} \
         --min-avg-qual {params.phred} \
         --min-var-freq {params.min_var_freq} \
-        --strand-filter 1 \
+        --strand-filter 0 \
+        --variants 1 \
         --output-vcf 1 \
         > {output.vcf}
         '''

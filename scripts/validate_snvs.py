@@ -72,33 +72,29 @@ def check_variants(file, nwgc_id, genomes):
             pos = int(vcf['variants/POS'][i])
 
             if genomes[nwgc_id].seq[(pos-1)] == vcf['variants/REF'][i]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
-                if 0.1 <= (vcf['calldata/ADF'][i,0])/(vcf['calldata/AD'][i,0,0]) <= 0.9: # Checks that variant is supported by both strands
+                mapping['position'].append(pos)
+                mapping['variant'].append(vcf['variants/ALT'][i,0])
+                mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
+                mapping['frequency'].append(float(vcf['calldata/AD'][i,0,0]/vcf['calldata/DP'][i,0]))
+
+            elif genomes[nwgc_id].seq[(pos-1)] == vcf['variants/ALT'][i,0]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
+                if (vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01: # Checks that reference variant meets cutoff
+                    mapping['position'].append(pos)
+                    mapping['variant'].append(vcf['variants/REF'][i])
+                    mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
+                    mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/vcf['calldata/DP'][i,0]))
+
+            elif genomes[nwgc_id].seq[(pos-1)] == 'N':
+                if (vcf['calldata/AD'][i,0,0])/(vcf['calldata/DP'][i,0]) < 0.5: # Checks that variant is a minority variant
                     mapping['position'].append(pos)
                     mapping['variant'].append(vcf['variants/ALT'][i,0])
                     mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
                     mapping['frequency'].append(float(vcf['calldata/AD'][i,0,0]/vcf['calldata/DP'][i,0]))
-
-            elif genomes[nwgc_id].seq[(pos-1)] == vcf['variants/ALT'][i,0]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
-                if (vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01: # Checks that reference variant meets cutoff
-                    if 0.1 <= (vcf['calldata/RDF'][i,0])/(vcf['calldata/RD'][i,0]) <= 0.9: # Checks that variant is supported by both strands
-                        mapping['position'].append(pos)
-                        mapping['variant'].append(vcf['variants/REF'][i])
-                        mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
-                        mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/vcf['calldata/DP'][i,0]))
-
-            elif genomes[nwgc_id].seq[(pos-1)] == 'N':
-                if (vcf['calldata/AD'][i,0,0])/(vcf['calldata/DP'][i,0]) < 0.5: # Checks that variant is a minority variant
-                    if 0.1 <= (vcf['calldata/ADF'][i,0])/(vcf['calldata/AD'][i,0,0]) <= 0.9: # Checks that variant is supported by both strands
-                        mapping['position'].append(pos)
-                        mapping['variant'].append(vcf['variants/ALT'][i,0])
-                        mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
-                        mapping['frequency'].append(float(vcf['calldata/AD'][i,0,0]/vcf['calldata/DP'][i,0]))
                 elif (vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01: # Checks that reference variant meets cutoff
-                    if 0.1 <= (vcf['calldata/RDF'][i,0])/(vcf['calldata/RD'][i,0]) <= 0.9: # Checks that variant is supported by both strands
-                            mapping['position'].append(pos)
-                            mapping['variant'].append(vcf['variants/REF'][i])
-                            mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
-                            mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/vcf['calldata/DP'][i,0]))
+                    mapping['position'].append(pos)
+                    mapping['variant'].append(vcf['variants/REF'][i])
+                    mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
+                    mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/vcf['calldata/DP'][i,0]))
 
             else:
                 if ((vcf['calldata/AD'][i,0,0])/(vcf['calldata/DP'][i,0]) >= 0.01 and 0.1 <= vcf['calldata/ADF'][i,0]/vcf['calldata/AD'][i,0,0] <= 0.9) or ((vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01 and 0.1 <= vcf['calldata/RDF'][i,0]/vcf['calldata/RD'][i,0] <= 0.9):

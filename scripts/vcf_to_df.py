@@ -37,7 +37,6 @@ def map_variants(file):
                                        'variants/REF',
                                        'variants/ALT',
                                        'calldata/DP',
-                                       'calldata/RD',
                                        'calldata/AD'],
                                        types={'calldata/DP': 'i4', 'calldata/AD':'i4'})
     if vcf is not None:

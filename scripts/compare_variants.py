@@ -29,7 +29,9 @@ def load_df(file):
         df = pd.read_csv(tfile, sep = '\t')
         if 'nwgc_id' in df.columns:
             df['nwgc_id'] = df.nwgc_id.astype('str')
+
         if 'position' and 'variant' in df.columns:
+            df['position'] = pd.to_numeric(df.position, downcast='integer')
             df['snv'] = df.loc[:,['reference', 'position', 'variant']].apply(
                 lambda x: ''.join(x.dropna().astype(str)),
                 axis=1
@@ -48,7 +50,15 @@ def drop_indel(df):
     '''
     return df[df.variant.str.len() == 1].reset_index(drop=True)
 
-def compare_frequencies(df1, df2):
+def shared_ids(df1, df2):
+    '''
+    Returns nwgc_ids in both dataframes.
+    '''
+    ids_1 = set(df1['nwgc_id'])
+    ids_2 = set(df2['nwgc_id'])
+    return list(ids_2.intersection(ids_1))
+
+def compare_frequencies(df1, df2, samples):
     '''
     Creates dataframe containing the frequency of each sample variant in each pipeline
     '''
@@ -58,7 +68,7 @@ def compare_frequencies(df1, df2):
     variants = []
     coverage1 = []
     coverage2 = []
-    for nwgc_id in df1['nwgc_id'].unique():
+    for nwgc_id in samples:
         snvs1 = df1.loc[df1.nwgc_id == nwgc_id, 'snv']
         snvs2 = df2.loc[df2.nwgc_id == nwgc_id, 'snv']
         snvs = snvs1.append(snvs2).unique()
@@ -145,8 +155,11 @@ if __name__ == '__main__':
         filtered_A = drop_indel(filtered_A)
         filtered_B = drop_indel(filtered_B)
 
-    # Creates df with frequency & coverge of each variant in each dataset
-    compared = compare_frequencies(filtered_A, filtered_B)
+    # Creates list of nwgc_id's in both
+    samples = shared_ids(filtered_A, filtered_B)
+
+    # Creates df with frequency & coverage of each variant in each dataset
+    compared = compare_frequencies(filtered_A, filtered_B, samples)
 
     # Make ouput directories
     plots_path = args.output + 'plots/'

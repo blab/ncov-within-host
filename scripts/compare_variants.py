@@ -105,8 +105,8 @@ def plot_frequencies(df, label, output):
     ax1.set_xlabel("Freq in " + label[0])
     ax2.set_xlabel("Freq in " + label[0])
     ax1.set_aspect('equal', adjustable='box')
-    ax1.set_xlim(-0.05, 1)
-    ax1.set_ylim(-0.05, 1)
+    ax1.set_xlim(-0.05, 1.05)
+    ax1.set_ylim(-0.05, 1.05)
     ax1.set_xticks(np.arange(0, 1.1, 0.1))
     ax1.set_yticks(np.arange(0, 1.1, 0.1))
     ax2.set_aspect('equal', adjustable='box')
@@ -114,6 +114,7 @@ def plot_frequencies(df, label, output):
     ax2.set_ylim(-0.005, 0.1)
     ax2.set_xticks(np.arange(0, 0.12, 0.02))
     ax2.set_yticks(np.arange(0, 0.12, 0.02))
+    #ax1.set_xticklabels(ax1.get_xticklabels(), rotation='vertical')
 
     plt.tight_layout()
     return plt.savefig(fname=output, dpi=300)

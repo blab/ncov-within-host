@@ -1,0 +1,18 @@
+When assembling WA-DoH metadata:
+- Metadata was pulled from excel sheets posted in SFS Slack #data-transfer-nwgc
+- county Unknown = missing
+- Ages were listed as what I assumed to be birth dates for some WA-DoH samples. I converted these into age.
+- After copying files from windows to rhino, be sure to save as file names without spaces AND convert from dos2unix.
+
+The reference to align to is the same one Jover used for assembling the genomes: Wuhan/Hu-1/2019.
+
+When new sequences are added to GISAID, do the following:
+1. Delete everything in data folder except subfolder "wadoh_metadata"
+2. Delete everything in results folder except subfolder, "vcfs"
+3. Get sample numbers using this command:
+    find /fh/fast/bedford_t/seattleflu/assembly-ncov/*/process/mpileup/sars-cov-2/*.pileup | sed "s/.*\//- /; s/\.pileup//"
+4. Then manually add them to config.yaml
+5. Download metabase as xlsx --> export as TSV --> transfer to rhino --> convert to unix format
+6. Add in WA-DoH metadata to 'wadoh_metadata'
+7. Source environment to download GISAID sequences and data
+8. Run snakemake!

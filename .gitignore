@@ -1,0 +1,6 @@
+results/
+data/
+pipeline-validation/
+choose-replicates/
+notebooks/.ipynb_checkpoints/
+.snakemake/

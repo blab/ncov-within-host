@@ -154,24 +154,6 @@ rule validate_snvs:
         --output {output.snvs}
         '''
 
-#rule choose_random_pairs:
-#    message: 'Chooses random pairs as control for given pairs'
-#    input:
-#        metadata = rules.concat_metadata.output.metadata,
-#        pairs = 'results/{origin}_household_pairs.tsv',
-#        snvs = rules.validate_snvs.output.snvs
-#    output:
-#        pairs = 'results/metadata_{origin}_pairs.tsv'
-#    shell:
-#        '''
-#        python scripts/choose_random_pairs.py \
-#        --metadata {input.metadata} \
-#        --pairs {input.pairs} \
-#        --snvs {input.snvs} \
-#        --origin {wildcards.origin} \
-#        --output {output.pairs}
-#        '''
-
 rule construct_snvs_df:
     message: 'Creates df with all SNVs + annotations for samples in given tsv'
     input:

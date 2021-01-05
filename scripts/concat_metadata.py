@@ -25,7 +25,7 @@ def prep_global(df):
     '''
     Selects only necessary columns from global metadata.
     '''
-    df1 = df[df['submitting_lab'] == 'Seattle Flu Study']
+    df1 = df[df['submitting_lab'].str.contains('Seattle Flu Study', regex=False)]
     df2 = df1[['strain', 'date', 'location', 'country_exposure', 'region_exposure', 'division_exposure']]
     return df2
 

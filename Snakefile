@@ -10,26 +10,35 @@ rule all:
     input:
         snvs_df = 'results/snvs.json'
 
-rule download:
-    message: 'Downloading metadata and fasta files from S3'
+rule download_metadata:
+    message: "Downloading GISAID SARS-CoV-2 metadata from S3"
     output:
-        sequences = 'data/sequences_global.fasta',
-        metadata = 'data/metadata_global.tsv'
+        metadata = "data/metadata_gisaid.tsv"
     shell:
-        '''
-        aws s3 cp s3://nextstrain-ncov-private/metadata.tsv.gz - | gunzip -cq > {output.metadata}
-        aws s3 cp s3://nextstrain-ncov-private/sequences.fasta.gz - | gunzip -cq > {output.sequences}
-        '''
+        """
+        aws s3 cp s3://nextstrain-ncov-private/metadata.tsv.gz - | gunzip -cq >{output.metadata:q}
+        """
+
+rule download_aligned:
+    message: "Downloading aligned SARS-CoV-2 GISAID fasta files from S3 bucket"
+    output:
+        sequences = "data/aligned_gisaid.fasta"
+    params:
+        compression = "xz",
+        deflate = "xz -dcq"
+    shell:
+        """
+        aws s3 cp s3://nextstrain-ncov-private/aligned.fasta.{params.compression} - | {params.deflate} > {output.sequences:q}
+        """
 
 rule filter:
     message: 'Filtering to within-host Seattle Flu Study dataset'
     input:
-        sequences = rules.download.output.sequences,
-        metadata = rules.download.output.metadata
+        sequences = rules.download_aligned.output.sequences,
+        metadata = rules.download_metadata.output.metadata
     output:
         sequences = 'results/genomes.fasta'
     params:
-        min_length = 25000,
         exclude_where = 'submitting_lab!="Seattle Flu Study"',
         include_where = 'submitting_lab="Seattle Flu Study, University of Washington Medical Center"'
     shell:
@@ -37,28 +46,9 @@ rule filter:
         augur filter \
             --sequences {input.sequences} \
             --metadata {input.metadata} \
-            --min-length {params.min_length} \
             --exclude-where {params.exclude_where} \
             --include-where {params.include_where} \
             --output {output.sequences}
-        '''
-
-rule align:
-    message: 'Aligning sequences to Wuhan/Hu-1/2019'
-    input:
-        sequences = rules.filter.output.sequences,
-        reference = 'config/sars-cov-2.fasta'
-    output:
-        sequences = 'results/aligned.fasta'
-    shell:
-        '''
-        augur align \
-        --sequences {input.sequences} \
-        --reference-sequence {input.reference} \
-        --remove-reference \
-        --output {output.sequences} \
-        --remove-reference \
-        --nthreads 4
         '''
 
 rule clean_metabase:
@@ -95,9 +85,9 @@ rule concat_metadata:
     input:
         strains = '/fh/fast/bedford_t/seattleflu/aspera-data-backup/Flu/hcov19-batch-nwgc-id-strain.csv',
         wadoh = rules.clean_wadoh.output.metadata,
-        global_metadata = rules.download.output.metadata,
+        global_metadata = rules.download_metadata.output.metadata,
         metabase = rules.clean_metabase.output.metadata,
-        genomes = rules.align.output.sequences
+        genomes = rules.filter.output.sequences
     output:
         metadata = 'results/metadata.tsv'
     shell:
@@ -119,14 +109,14 @@ rule call_snvs:
     input:
         pileup = list_pileups
     output:
-        vcf = 'results/vcf/{sample}.vcf'
+        vcf = 'results/vcf_snvs/{sample}.vcf'
     params:
         min_cov = 100,
         phred = 30,
         min_var_freq = 0.01
     shell:
         '''
-        varscan mpileup2cns \
+        varscan mpileup2snp \
         {input.pileup} \
         --min-coverage {params.min_cov} \
         --min-avg-qual {params.phred} \
@@ -137,12 +127,46 @@ rule call_snvs:
         > {output.vcf}
         '''
 
+rule call_indels:
+    message: 'Calling SNVs compared to Wuhan-1 using varscan'
+    input:
+        pileup = list_pileups
+    output:
+        vcf = 'results/vcf_indels/{sample}.vcf'
+    params:
+        min_cov = 100,
+        phred = 30,
+        min_var_freq = 0.01
+    shell:
+        '''
+        varscan mpileup2indel \
+        {input.pileup} \
+        --min-coverage {params.min_cov} \
+        --min-avg-qual {params.phred} \
+        --min-var-freq {params.min_var_freq} \
+        --strand-filter 0 \
+        --variants 1 \
+        --output-vcf 1 \
+        > {output.vcf}
+        '''
+
+rule get_indels:
+    message: 'dummy rule to force indel calling'
+    input:
+        vcfs = expand('results/vcf_indels/{sample}.vcf', sample=config['samples'])
+    output:
+        text = 'results/indels_done.txt'
+    shell:
+        '''
+        echo "Yeehaw" > {output.txt}
+        '''
+
 rule validate_snvs:
     message: 'Generating iSNVs for each sample'
     input:
         metadata = rules.concat_metadata.output.metadata,
-        sequences = rules.align.output.sequences,
-        vcfs = expand('results/vcf/{sample}.vcf', sample=config['samples'])
+        sequences = rules.filter.output.sequences,
+        vcfs = expand('results/vcf_snvs/{sample}.vcf', sample=config['samples'])
     output:
         snvs = 'results/snvs.json'
     shell:
@@ -159,7 +183,7 @@ rule construct_snvs_df:
     input:
         metadata = 'results/metadata_{origin}_{dataset}.tsv',
         snvs = rules.validate_snvs.output.snvs,
-        sequences = rules.align.output.sequences,
+        sequences = rules.filter.output.sequences,
         reference = 'config/reference_seq.gb'
     output:
         snvs = 'results/snvs_{origin}_{dataset}.tsv'

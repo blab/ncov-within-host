@@ -24,7 +24,7 @@ def clean(df):
     '''
     Cleans metadata
     '''
-    df = df.drop(columns = ['sex', 'collection_date', 'county'])
+    df = df.drop(columns = ['sex', 'collection_date', 'county', 'investigator_id'])
     df = df.dropna(subset=['nwgc_id'])
     df = df.astype({'nwgc_id': 'int32'})
     df = df.reset_index(drop=True)

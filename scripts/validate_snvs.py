@@ -71,20 +71,20 @@ def check_variants(file, nwgc_id, genomes):
         for i in range(len(vcf['variants/POS'])):
             pos = int(vcf['variants/POS'][i])
 
-            if genomes[nwgc_id].seq[(pos-1)] == vcf['variants/REF'][i]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
+            if genomes[nwgc_id].seq[(pos-1)].upper() == vcf['variants/REF'][i]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
                 mapping['position'].append(pos)
                 mapping['variant'].append(vcf['variants/ALT'][i,0])
                 mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
                 mapping['frequency'].append(float(vcf['calldata/AD'][i,0,0]/vcf['calldata/DP'][i,0]))
 
-            elif genomes[nwgc_id].seq[(pos-1)] == vcf['variants/ALT'][i,0]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
+            elif genomes[nwgc_id].seq[(pos-1)].upper() == vcf['variants/ALT'][i,0]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
                 if (vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01: # Checks that reference variant meets cutoff
                     mapping['position'].append(pos)
                     mapping['variant'].append(vcf['variants/REF'][i])
                     mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
                     mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/vcf['calldata/DP'][i,0]))
 
-            elif genomes[nwgc_id].seq[(pos-1)] == 'N':
+            elif genomes[nwgc_id].seq[(pos-1)].upper() == 'N':
                 if (vcf['calldata/AD'][i,0,0])/(vcf['calldata/DP'][i,0]) < 0.5: # Checks that variant is a minority variant
                     mapping['position'].append(pos)
                     mapping['variant'].append(vcf['variants/ALT'][i,0])
@@ -100,7 +100,7 @@ def check_variants(file, nwgc_id, genomes):
                 if ((vcf['calldata/AD'][i,0,0])/(vcf['calldata/DP'][i,0]) >= 0.01 and 0.1 <= vcf['calldata/ADF'][i,0]/vcf['calldata/AD'][i,0,0] <= 0.9) or ((vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01 and 0.1 <= vcf['calldata/RDF'][i,0]/vcf['calldata/RD'][i,0] <= 0.9):
                     print('\nCheck ' + str(nwgc_id) + '.vcf. Genome does not match reference or variant.')
                     print('Position: ' + str(pos))
-                    print('Genome: '+ genomes[nwgc_id].seq[pos-1])
+                    print('Genome: '+ genomes[nwgc_id].seq[pos-1]).upper()
                     print('Ref: ' + vcf['variants/REF'][i])
                     print('Alt: ' + vcf['variants/ALT'][i,0])
     return mapping
@@ -117,8 +117,6 @@ def create_snvs(vcfs, genomes):
         if nwgc_id in genomes.keys():
             snvs[nwgc_id] = {}
             snvs[nwgc_id] = check_variants(file, nwgc_id, genomes)
-    #    else:
-    #        print('For ' + file + ', sample is not in fasta.')
     return snvs
 
 def add_total(snvs):

@@ -4,3 +4,5 @@ pipeline-validation/
 choose-replicates/
 notebooks/.ipynb_checkpoints/
 .snakemake/
+sanity-checks/
+config/household_ids.tsv

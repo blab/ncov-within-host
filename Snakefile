@@ -8,7 +8,7 @@ import glob
 
 rule all:
     input:
-        snvs_df = 'results/snvs.json'
+        snvs_df = 'results/household/snvs.tsv'
 
 rule download_metadata:
     message: "Downloading GISAID SARS-CoV-2 metadata from S3"
@@ -86,6 +86,7 @@ rule concat_metadata:
         strains = '/fh/fast/bedford_t/seattleflu/aspera-data-backup/Flu/hcov19-batch-nwgc-id-strain.csv',
         wadoh = rules.clean_wadoh.output.metadata,
         global_metadata = rules.download_metadata.output.metadata,
+        wdrs = 'data/metadata_clusters.tsv',
         metabase = rules.clean_metabase.output.metadata,
         genomes = rules.filter.output.sequences
     output:
@@ -97,6 +98,7 @@ rule concat_metadata:
         --wadoh {input.wadoh} \
         --global-metadata {input.global_metadata} \
         --metabase {input.metabase} \
+        --wdrs {input.wdrs} \
         --genomes {input.genomes} \
         --output {output.metadata}
         '''
@@ -181,18 +183,21 @@ rule validate_snvs:
 rule construct_snvs_df:
     message: 'Creates df with all SNVs + annotations for samples in given tsv'
     input:
-        metadata = 'results/metadata_{origin}_{dataset}.tsv',
+        metadata = 'results/metadata.tsv',
         snvs = rules.validate_snvs.output.snvs,
         sequences = rules.filter.output.sequences,
         reference = 'config/reference_seq.gb'
+    params:
+        ids = 'config/{analysis}_ids.tsv'
     output:
-        snvs = 'results/snvs_{origin}_{dataset}.tsv'
+        snvs = 'results/{analysis}/snvs.tsv'
     shell:
         '''
         python scripts/create_snvs_df.py \
         --metadata {input.metadata} \
         --snvs {input.snvs} \
         --sequences {input.sequences} \
+        --ids {params.ids} \
         --reference {input.reference} \
         --output {output.snvs}
         '''

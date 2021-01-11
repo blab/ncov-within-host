@@ -53,6 +53,16 @@ def merge_metabase(df, metadata):
                 df.loc[i, ['sample_identifier', 'individual_identifier', 'clia_barcode', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']] = metadata.loc[j, ['sample_identifier','individual_identifier', 'clia_barcode', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']]
     return df
 
+def coalesce_address_symptom(df):
+    '''
+    Left merges df + coalesces columns where the values are the same.
+    '''
+    df['address_identifier_x'].update(df['address_identifier_y'])
+    df['symptom_onset_x'].update(df['symptom_onset_y'])
+    df.rename(columns={"address_identifier_x": "address_identifier", "symptom_onset_x" : "symptom_onset"}, inplace=True)
+    df.drop(['address_identifier_y', 'symptom_onset_y'], axis=1, inplace=True)
+    return df
+
 def filter_metadata(fasta, df):
     '''
     Removes samples from metadata not in fasta file.
@@ -72,6 +82,7 @@ if __name__ == '__main__':
     parser.add_argument('--wadoh', type=str, required=True, help = 'WA-DoH metadata')
     parser.add_argument('--global-metadata', type=str, required=True, help = 'global metadata')
     parser.add_argument('--metabase', type=str, required=True, help = 'Metabase metadata')
+    parser.add_argument('--wdrs', type=str, required=True, help = 'WDRS metadata')
     parser.add_argument('--genomes', type=str, required=True, help = 'Fasta')
     parser.add_argument('--output', type=str, required=True, help = 'location of output tsv')
     args = parser.parse_args()
@@ -80,6 +91,7 @@ if __name__ == '__main__':
     strains = load_metadata(args.strains, ',')
     wadoh = load_metadata(args.wadoh, '\t')
     global_metadata = load_metadata(args.global_metadata, '\t')
+    wdrs = load_metadata(args.wdrs, '\t')
     metabase = load_metadata(args.metabase, '\t')
 
     # Prep metadata for merging
@@ -90,8 +102,10 @@ if __name__ == '__main__':
     dfA = merge(strains_prepped, wadoh, 'nwgc_id')
     dfB = merge(dfA, global_prepped, 'strain')
     dfC = merge_metabase(dfB, metabase)
-    dfD = filter_metadata(args.genomes, dfC)
+    dfD = merge(dfC, wdrs, 'strain')
+    dfE = coalesce_address_symptom(dfD)
+    dfF = filter_metadata(args.genomes, dfE)
 
     # Save final df
     with open(args.output, 'w') as f:
-        dfD.to_csv(f, sep = '\t', index=False)
+        dfF.to_csv(f, sep = '\t', index=False)

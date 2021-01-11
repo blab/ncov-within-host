@@ -48,7 +48,13 @@ def drop_indel(df):
     '''
     Drops indel variants
     '''
-    return df[df.variant.str.len() == 1].reset_index(drop=True)
+    return df[(df.variant.str.len() == 1) & (df.reference.str.len() == 1)].reset_index(drop=True)
+
+def drop_snp(df):
+    '''
+    Drops snp variants
+    '''
+    return df[~((df.variant.str.len() == 1) & (df.reference.str.len() == 1))].reset_index(drop=True)
 
 def shared_ids(df1, df2):
     '''
@@ -139,6 +145,7 @@ if __name__ == '__main__':
     parser.add_argument('--variants', nargs = '+', type=str, required=True, help='path to input files')
     parser.add_argument('--cutoff', type=float, default=0.01, help='variant frequency cutoff')
     parser.add_argument('--no-indel', action='store_true', help = 'flag to only compare snvs, not indels')
+    parser.add_argument('--no-snp', action='store_true', help = 'flag to only compare snvs, not indels')
     parser.add_argument('--label', nargs='+', type=str, required=True, help = 'pipeline labels')
     parser.add_argument('--output', type=str, required=True, help = 'location of output folder')
     args = parser.parse_args()
@@ -155,6 +162,11 @@ if __name__ == '__main__':
     if args.no_indel == True:
         filtered_A = drop_indel(filtered_A)
         filtered_B = drop_indel(filtered_B)
+
+    # Removes snps
+    if args.no_snp == True:
+        filtered_A = drop_snp(filtered_A)
+        filtered_B = drop_snp(filtered_B)
 
     # Creates list of nwgc_id's in both
     samples = shared_ids(filtered_A, filtered_B)

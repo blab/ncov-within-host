@@ -59,8 +59,8 @@ rule clean_metabase:
         metadata = 'data/metadata_metabase_clean.tsv'
     shell:
         '''
-        awk 'BEGIN{{FS=OFS="\t"}}{{print $1,$2,$3,$5,$6,$8,$9,$10,$13}}' {input.metadata} \
-        | sed 's/avg_hcov19_crt/avg_ct/; s/"//g; s/\]//g; s/\[//g' \
+        awk 'BEGIN{{FS=OFS="\t"}}{{print $2,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15}}' {input.metadata} \
+        | sed 's/avg_hcov19_crt/avg_ct/' \
         > {output.metadata}
         '''
 
@@ -83,7 +83,7 @@ rule clean_wadoh:
 rule concat_metadata:
     message: 'Combining Metabase, WA-DoH, and strains metadata & filtering to genomes'
     input:
-        strains = '/fh/fast/bedford_t/seattleflu/aspera-data-backup/Flu/hcov19-batch-nwgc-id-strain.csv',
+        strains = 'data/sequence-identifiers.tsv',
         wadoh = rules.clean_wadoh.output.metadata,
         global_metadata = rules.download_metadata.output.metadata,
         wdrs = 'data/metadata_clusters.tsv',
@@ -160,7 +160,7 @@ rule get_indels:
         text = 'results/indels_done.txt'
     shell:
         '''
-        echo "Yeehaw" > {output.txt}
+        echo "Yeehaw" > {output.text}
         '''
 
 rule validate_snvs:

@@ -12,14 +12,9 @@ def load_metadata(file, sep):
     '''
     with open(file) as tfile:
         metadata = pd.read_csv(tfile, sep = sep)
+        if 'nwgc_id' in metadata.columns:
+            metadata['nwgc_id'] = metadata.nwgc_id.astype('str')
     return metadata
-
-def prep_strains(df):
-    '''
-    Eliminates extraneous text from strain name.
-    '''
-    df['strain'] = df['strain'].str.replace('^.*?(/)', '', regex=True)
-    return df
 
 def prep_global(df):
     '''
@@ -53,14 +48,15 @@ def merge_metabase(df, metadata):
                 df.loc[i, ['sample_identifier', 'individual_identifier', 'clia_barcode', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']] = metadata.loc[j, ['sample_identifier','individual_identifier', 'clia_barcode', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']]
     return df
 
-def coalesce_address_symptom(df):
+def coalesce_address_symptom_ct(df):
     '''
     Left merges df + coalesces columns where the values are the same.
     '''
     df['address_identifier_x'].update(df['address_identifier_y'])
     df['symptom_onset_x'].update(df['symptom_onset_y'])
-    df.rename(columns={"address_identifier_x": "address_identifier", "symptom_onset_x" : "symptom_onset"}, inplace=True)
-    df.drop(['address_identifier_y', 'symptom_onset_y'], axis=1, inplace=True)
+    df['avg_ct_x'].update(df['avg_ct_y'])
+    df.rename(columns={"address_identifier_x": "address_identifier", "symptom_onset_x" : "symptom_onset", "avg_ct_x" : "avg_ct"}, inplace=True)
+    df.drop(['address_identifier_y', 'symptom_onset_y', "avg_ct_y"], axis=1, inplace=True)
     return df
 
 def filter_metadata(fasta, df):
@@ -88,24 +84,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Load all metadata to merge
-    strains = load_metadata(args.strains, ',')
+    strains = load_metadata(args.strains, '\t')
     wadoh = load_metadata(args.wadoh, '\t')
     global_metadata = load_metadata(args.global_metadata, '\t')
     wdrs = load_metadata(args.wdrs, '\t')
     metabase = load_metadata(args.metabase, '\t')
 
     # Prep metadata for merging
-    strains_prepped = prep_strains(strains)
     global_prepped = prep_global(global_metadata)
 
     # Merge dataframes
-    dfA = merge(strains_prepped, wadoh, 'nwgc_id')
+    dfA = merge(strains, wadoh, 'nwgc_id')
     dfB = merge(dfA, global_prepped, 'strain')
-    dfC = merge_metabase(dfB, metabase)
+    dfC = merge(dfB, metabase, 'sample_barcode')
     dfD = merge(dfC, wdrs, 'strain')
-    dfE = coalesce_address_symptom(dfD)
-    dfF = filter_metadata(args.genomes, dfE)
+    dfE = coalesce_address_symptom_ct(dfD)
 
     # Save final df
     with open(args.output, 'w') as f:
-        dfF.to_csv(f, sep = '\t', index=False)
+        dfE.to_csv(f, sep = '\t', index=False)

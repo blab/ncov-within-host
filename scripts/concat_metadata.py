@@ -5,6 +5,7 @@ Combines metadata from GISAID, Metabase, WA-DoH, and the strain-to-nwgc-id file.
 import argparse
 import pandas as pd
 from Bio import SeqIO
+import numpy as np
 
 def load_metadata(file, sep):
     '''
@@ -31,23 +32,6 @@ def merge(df1, df2, on):
     df = df1.merge(df2, how='left', on=on)
     return df
 
-def merge_metabase(df, metadata):
-    '''
-    Merges metabase df with other df.
-    '''
-    df['sample_identifier'] = ''
-    df['individual_identifier'] = ''
-    df['clia_barcode'] = ''
-    df['age'] = ''
-    df['puma'] = ''
-    df['address_identifier'] = ''
-    df['symptom_onset'] = ''
-    for i in df.index:
-        for j in metadata.index:
-            if str(df.nwgc_id[i]) in metadata.nwgc_id[j]:
-                df.loc[i, ['sample_identifier', 'individual_identifier', 'clia_barcode', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']] = metadata.loc[j, ['sample_identifier','individual_identifier', 'clia_barcode', 'age', 'puma', 'address_identifier', 'symptom_onset', 'avg_ct']]
-    return df
-
 def coalesce_address_symptom_ct(df):
     '''
     Left merges df + coalesces columns where the values are the same.
@@ -57,6 +41,24 @@ def coalesce_address_symptom_ct(df):
     df['avg_ct_x'].update(df['avg_ct_y'])
     df.rename(columns={"address_identifier_x": "address_identifier", "symptom_onset_x" : "symptom_onset", "avg_ct_x" : "avg_ct"}, inplace=True)
     df.drop(['address_identifier_y', 'symptom_onset_y', "avg_ct_y"], axis=1, inplace=True)
+    return df
+
+
+def add_reference(df):
+    '''
+    Adds column containing reference strain for all samples.
+    '''
+    df['reference'] = df['strain']
+    for index, row in df[df.reference.isna()].iterrows():
+        if row['nwgc_id'] in df[df.index != index]['nwgc_id'].unique():
+            ref = df[(df.index != index) & (df.nwgc_id == row['nwgc_id'])]['strain'].dropna()
+        elif row['sample_barcode'] in df[df.index != index]['sample_barcode'].unique():
+            ref = df.loc[(df.index != index) & (df.sample_barcode == row['sample_barcode'])]['strain'].dropna()
+        elif row['phl_accession'] in df[df.index != index]['phl_accession'].unique():
+            ref = df.loc[(df.index != index) & (df.phl_accession == row['phl_accession'])]['strain'].dropna()
+        else:
+            ref = pd.Series(np.nan)
+        df.loc[index, 'reference'] = ref.item()
     return df
 
 def filter_metadata(fasta, df):
@@ -99,7 +101,8 @@ if __name__ == '__main__':
     dfC = merge(dfB, metabase, 'sample_barcode')
     dfD = merge(dfC, wdrs, 'strain')
     dfE = coalesce_address_symptom_ct(dfD)
+    dfF = add_reference(dfE)
 
     # Save final df
     with open(args.output, 'w') as f:
-        dfE.to_csv(f, sep = '\t', index=False)
+        dfF.to_csv(f, sep = '\t', index=False)

@@ -28,7 +28,7 @@ rule download_aligned:
         deflate = "xz -dcq"
     shell:
         """
-        aws s3 cp s3://nextstrain-ncov-private/aligned.fasta.{params.compression} - | {params.deflate} > {output.sequences:q}
+        aws s3 cp s3://nextstrain-ncov-private/aligned_gisaid.fasta.{params.compression} - | {params.deflate} > {output.sequences:q}
         """
 
 rule filter:
@@ -39,8 +39,9 @@ rule filter:
     output:
         sequences = 'results/genomes.fasta'
     params:
-        exclude_where = 'submitting_lab!="Seattle Flu Study"',
-        include_where = 'submitting_lab="Seattle Flu Study, University of Washington Medical Center"'
+        exclude_where = 'division!="Washington"',
+        include_where = 'submitting_lab="Seattle Flu Study, University of Washington Medical Center" or submitting_lab="Seattle Flu Study"'
+    conda: 'config/within-host.yaml'
     shell:
         '''
         augur filter \
@@ -73,6 +74,7 @@ rule clean_wadoh:
         metadata = list_wadoh
     output:
         metadata = 'data/metadata_wadoh_clean.tsv'
+    conda: 'config/within-host.yaml'
     shell:
         '''
         python scripts/clean_wadoh_metadata.py \
@@ -91,6 +93,7 @@ rule concat_metadata:
         genomes = rules.filter.output.sequences
     output:
         metadata = 'results/metadata.tsv'
+    conda: 'config/within-host.yaml'
     shell:
         '''
         python scripts/concat_metadata.py \
@@ -116,6 +119,7 @@ rule call_snvs:
         min_cov = 100,
         phred = 30,
         min_var_freq = 0.01
+    conda: 'config/within-host.yaml'
     shell:
         '''
         varscan mpileup2snp \
@@ -139,6 +143,7 @@ rule call_indels:
         min_cov = 100,
         phred = 30,
         min_var_freq = 0.01
+    conda: 'config/within-host.yaml'
     shell:
         '''
         varscan mpileup2indel \
@@ -171,6 +176,7 @@ rule validate_snvs:
         vcfs = expand('results/vcf_snvs/{sample}.vcf', sample=config['samples'])
     output:
         snvs = 'results/snvs.json'
+    conda: 'config/within-host.yaml'
     shell:
         '''
         python scripts/validate_snvs.py \
@@ -191,6 +197,7 @@ rule construct_snvs_df:
         ids = 'config/{analysis}_ids.tsv'
     output:
         snvs = 'results/{analysis}/snvs.tsv'
+    conda: 'config/within-host.yaml'
     shell:
         '''
         python scripts/create_snvs_df.py \

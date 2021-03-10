@@ -26,6 +26,17 @@ def load_genomes(fasta):
         genomes = SeqIO.to_dict(SeqIO.parse(f, 'fasta'))
     return genomes
 
+#def check_genomes(genomes, mfile):
+#    '''
+#    Checks that reference genome are available.
+#    '''
+#    with open(mfile, 'r') as f:
+#        metadata = pd.read_csv(f, sep = '\t')
+#    refs = set(metadata['reference'])
+#    intersect = set(genomes.keys()).intersection(refs)
+#    absent = [r for r in refs if r not in intersect]
+#    print(absent)
+
 def check_variants(file, ref, genomes):
     '''
     Opens vcf file and checks if SNVs based off reference genome are SNVs relative to sample consensus genome.
@@ -66,7 +77,7 @@ def check_variants(file, ref, genomes):
                     mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
                     mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/vcf['calldata/DP'][i,0]))
 
-            elif genomes[ref].seq[(pos-1)].upper() == 'N':
+            elif genomes[ref].seq[(pos-1)].upper() == 'N' or genomes[ref].seq[(pos-1)] == '-':
                 if (vcf['calldata/AD'][i,0,0])/(vcf['calldata/DP'][i,0]) < 0.5: # Checks that variant is a minority variant
                     mapping['position'].append(pos)
                     mapping['variant'].append(vcf['variants/ALT'][i,0])
@@ -81,6 +92,7 @@ def check_variants(file, ref, genomes):
             else:
                 if ((vcf['calldata/AD'][i,0,0])/(vcf['calldata/DP'][i,0]) >= 0.01 and 0.1 <= vcf['calldata/ADF'][i,0]/vcf['calldata/AD'][i,0,0] <= 0.9) or ((vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01 and 0.1 <= vcf['calldata/RDF'][i,0]/vcf['calldata/RD'][i,0] <= 0.9):
                     print('\nCheck ' + file + ' Genome does not match reference or variant.')
+                    print('Strain: ' + ref)
                     print('Position: ' + str(pos))
                     print('Genome: '+ genomes[ref].seq[pos-1]).upper()
                     print('Ref: ' + vcf['variants/REF'][i])
@@ -94,11 +106,13 @@ def create_snvs(mfile, vcfs, genomes):
     with open(mfile, 'r') as f:
         metadata = pd.read_csv(f, sep = '\t')
     snvs = {}
-    for id in metadata['id'].unique():
-        file = [path for path in vcfs if id in path][0]
-        reference = metadata.at[id, 'reference']
-        snvs[id] = {}
-        snvs[id] = check_variants(file, reference, genomes)
+    for index, row in metadata.iterrows():
+        id = row['id']
+        file = [path for path in vcfs if id in path]
+        if len(file) > 0:
+            reference = row['reference']
+            snvs[id] = {}
+            snvs[id] = check_variants(file[0], reference, genomes)
     return snvs
 
 def add_total(snvs):
@@ -123,6 +137,7 @@ if __name__ == '__main__':
 
     # Loads dictionary of consensus genomes
     genomes = load_genomes(args.sequences)
+    #check_genomes(genomes, args.metadata)
 
     # Makes dictionary of iSNVs
     snvs = create_snvs(args.metadata, args.vcf, genomes)

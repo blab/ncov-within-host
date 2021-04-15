@@ -118,7 +118,8 @@ rule call_snvs:
     params:
         min_cov = 100,
         phred = 30,
-        min_var_freq = 0.01
+        min_var_freq = 0.01,
+        min_reads = 10
     conda: 'config/within-host.yaml'
     shell:
         '''
@@ -127,8 +128,8 @@ rule call_snvs:
         --min-coverage {params.min_cov} \
         --min-avg-qual {params.phred} \
         --min-var-freq {params.min_var_freq} \
+        --min-reads2 {params.min_reads} \
         --strand-filter 0 \
-        --variants 1 \
         --output-vcf 1 \
         > {output.vcf}
         '''
@@ -207,4 +208,55 @@ rule construct_snvs_df:
         --ids {params.ids} \
         --reference {input.reference} \
         --output {output.snvs}
+        '''
+
+rule find_replicates:
+    message: 'Generating TSV of all replicates'
+    input:
+        metadata = 'results/metadata.tsv'
+    params:
+        match_on = ['nwgc_id', 'phl_accession', 'sample_barcode', 'strain']
+    output:
+        replicates = 'results/replicates/replicate_mapping.tsv'
+    conda: 'config/within-host.yaml'
+    shell:
+        '''
+        python scripts/find_replicates.py \
+        --metadata {input.metadata} \
+        --match-on {params.match_on} \
+        --output {output.replicates}
+        '''
+
+rule construct_replicates_df:
+    message: 'Generating TSV with snvs for all replicates'
+    input:
+        metadata = 'results/metadata.tsv',
+        vcfs = expand('results/vcf_snvs/{replicate}.vcf', replicate=config['replicates'])
+    output:
+        snvs = 'results/replicates/snvs.tsv'
+    conda: 'config/within-host.yaml'
+    shell:
+        '''
+        python scripts/vcf_to_df.py \
+        --metadata {input.metadata} \
+        --vcf {input.vcfs} \
+        --output {output.snvs}
+        '''
+
+rule compare_replicates:
+    message: 'Comparing replicates'
+    input:
+        snvs = 'results/replicates/snvs.tsv',
+        replicates = 'results/replicates/replicate_mapping.tsv',
+        pileups = '/fh/scratch/delete10/bedford_t/ncov_pileups/'
+    output:
+        directory = 'results/replicates/'
+    conda: 'config/within-host.yaml'
+    shell:
+        '''
+        python scripts/compare_replicates.py \
+        --variants {input.snvs} \
+        --replicates {input.replicates} \
+        --pileups {input.pileups} \
+        --output {output.directory}
         '''

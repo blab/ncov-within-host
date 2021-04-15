@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--metadata', type=str, required=True, help='tsv with sample names and ref')
     parser.add_argument('--sequences', type=str, required=True, help = 'fasta file of consensus genomes')
-    parser.add_argument('--vcf', nargs = '+', type=str, required=True, help = 'directory containing vcf files')
+    parser.add_argument('--vcf', nargs = '+', type=str, required=True, help = 'list of vcf files')
     parser.add_argument('--output', type=str, required=True, help = 'location of output json')
     args = parser.parse_args()
 

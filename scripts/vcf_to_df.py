@@ -32,6 +32,7 @@ def map_variants(file):
     reference = []
     frequency = []
     coverage = []
+    reads = []
 
     vcf = allel.read_vcf(file, fields=['variants/POS',
                                        'variants/REF',
@@ -45,6 +46,7 @@ def map_variants(file):
             variant.append(vcf['variants/ALT'][i,0])
             reference.append(vcf['variants/REF'][i])
             coverage.append(int(vcf['calldata/DP'][i,0]))
+            reads.append(int(vcf['calldata/AD'][i,0,0]))
             freq = float(vcf['calldata/AD'][i,0,0]/vcf['calldata/DP'][i,0])
             frequency.append(freq)
 
@@ -52,24 +54,24 @@ def map_variants(file):
                         'variant':variant,
                         'reference':reference,
                         'frequency':frequency,
-                        'coverage':coverage})
+                        'coverage':coverage,
+                        'reads':reads})
     return df
 
-def multiplex_mapping(directory, metadata):
+def multiplex_mapping(vcfs, metadata):
     '''
     Constructs df containing all variants from a list of vcfs
     '''
     df = pd.DataFrame()
-    vcfs = os.listdir(directory)
-
     for file in vcfs:
-        nwgc_id = file.split('.')[0]
-        if metadata['nwgc_id'].str.contains(nwgc_id).any():
-            sample = map_variants(directory + file)
-            sample['nwgc_id'] = nwgc_id
+        path = file.split('/')
+        id = path[-1].split('.')[0]
+        if metadata['id'].str.contains(id).any():
+            sample = map_variants(file)
+            sample['id'] = id
             df = df.append(sample)
 
-    df = df.merge(metadata[['strain', 'nwgc_id', 'avg_ct']], how = 'left')
+    df = df.merge(metadata[['strain', 'id', 'avg_ct', 'nwgc_id']], how = 'left')
     return df
 
 def reorder_cols(df, cols):
@@ -85,7 +87,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument('--metadata', type=str, required=True, help='tsv with sample names and nwgc_id')
-    parser.add_argument('--vcf', type=str, required=True, help = 'directory containing vcf files')
+    parser.add_argument('--vcf', nargs = '+', type=str, required=True, help = 'list of vcf files')
     parser.add_argument('--output', type=str, required=True, help = 'location of output tsv')
     args = parser.parse_args()
 
@@ -96,7 +98,7 @@ if __name__ == '__main__':
     variants = multiplex_mapping(args.vcf, metadata)
 
     # Reorder columns
-    columns_order = ['strain', 'nwgc_id', 'position', 'variant', 'reference']
+    columns_order = ['strain', 'id', 'position', 'variant', 'reference']
     ordered = reorder_cols(variants, columns_order)
 
     # Save variants

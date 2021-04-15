@@ -1,0 +1,22 @@
+name: nextstrain
+channels:
+- conda-forge
+- bioconda
+- defaults
+dependencies:
+- augur
+- nextstrain-cli
+- python>=3.6*
+- nodejs>=10
+- pandas
+- seaborn
+- matplotlib
+- numpy
+- scikit-allel
+- biopython
+- varscan
+- git
+- pip
+- pip:
+  - awscli
+  - rethinkdb==2.3.0.post6

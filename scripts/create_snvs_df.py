@@ -15,7 +15,7 @@ def load_metadata(file):
     with open(file) as tfile:
         df = pd.read_csv(tfile, sep = '\t')
         df['nwgc_id'] = df.nwgc_id.astype('str')
-    return df[['strain', 'nwgc_id', 'date', 'avg_ct', 'primers', 'symptom_onset', 'address_identifier', 'individual_identifier', 'sample_identifier', 'age_bin', 'age', 'location', 'puma', 'origin', 'batch']]
+    return df[['strain', 'id', 'nwgc_id', 'date', 'avg_ct', 'primers', 'symptom_onset', 'address_identifier', 'individual_identifier', 'sample_identifier', 'age_bin', 'age', 'location', 'puma', 'origin', 'batch']]
 
 def load_snvs(file):
     '''

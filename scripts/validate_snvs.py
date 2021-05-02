@@ -18,13 +18,13 @@ os.environ["NUMEXPR_MAX_THREADS"]="272" # Prevents NUM_EXPr error that occurs wh
 import allel
 import json
 
-def load_genomes(fasta):
-    '''
-    Loads fasta of genomes as dictionary.
-    '''
-    with open(fasta, 'r') as f:
-        genomes = SeqIO.to_dict(SeqIO.parse(f, 'fasta'))
-    return genomes
+#def load_genomes(fasta):
+#    '''
+#    Loads fasta of genomes as dictionary.
+#    '''
+#    with open(fasta, 'r') as f:
+#        genome = SeqIO.to_dict(SeqIO.parse(f, 'fasta'))
+#    return genome
 
 #def check_genomes(genomes, mfile):
 #    '''
@@ -37,7 +37,7 @@ def load_genomes(fasta):
 #    absent = [r for r in refs if r not in intersect]
 #    print(absent)
 
-def check_variants(file, ref, genomes):
+def check_variants(file, genome):
     '''
     Opens vcf file and checks if SNVs based off reference genome are SNVs relative to sample consensus genome.
     If so, adds SNVs to dictionary supplied by mapping.
@@ -47,6 +47,9 @@ def check_variants(file, ref, genomes):
     mapping['variant'] = []
     mapping['coverage'] = []
     mapping['frequency'] = []
+    mapping['consensus'] = []
+    mapping['reads'] = []
+    mapping['type'] = []
 
     vcf = allel.read_vcf(file, fields=['variants/POS',
                                        'variants/REF',
@@ -63,43 +66,63 @@ def check_variants(file, ref, genomes):
     if vcf is not None:
         for i in range(len(vcf['variants/POS'])):
             pos = int(vcf['variants/POS'][i])
+            consensus = genome.seq[(pos-1)].upper()
+            ref = vcf['variants/REF'][i]
+            alt = vcf['variants/ALT'][i,0]
+            cov = int(vcf['calldata/DP'][i,0])
 
-            if genomes[ref].seq[(pos-1)].upper() == vcf['variants/REF'][i]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
+            if consensus == ref: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
                 mapping['position'].append(pos)
-                mapping['variant'].append(vcf['variants/ALT'][i,0])
-                mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
-                mapping['frequency'].append(float(vcf['calldata/AD'][i,0,0]/vcf['calldata/DP'][i,0]))
+                mapping['variant'].append(alt)
+                mapping['coverage'].append(cov)
+                mapping['frequency'].append(float(vcf['calldata/AD'][i,0,0]/cov))
+                mapping['consensus'].append(consensus)
+                mapping['reads'].append(int(vcf['calldata/AD'][i,0,0]))
+                mapping['type'].append('Alternate')
 
-            elif genomes[ref].seq[(pos-1)].upper() == vcf['variants/ALT'][i,0]: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
-                if (vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01: # Checks that reference variant meets cutoff
+            elif consensus == alt: # Minus 1 corrects for position numbering beginning at 0 for SeqIO records.
+                if (vcf['calldata/RD'][i,0])/(cov) >= 0.01: # Checks that reference variant meets cutoff
                     mapping['position'].append(pos)
-                    mapping['variant'].append(vcf['variants/REF'][i])
-                    mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
-                    mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/vcf['calldata/DP'][i,0]))
+                    mapping['variant'].append(ref)
+                    mapping['coverage'].append(cov)
+                    mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/cov))
+                    mapping['consensus'].append(consensus)
+                    mapping['reads'].append(int(vcf['calldata/RD'][i,0]))
+                    mapping['type'].append('Reference')
 
-            elif genomes[ref].seq[(pos-1)].upper() == 'N' or genomes[ref].seq[(pos-1)] == '-':
-                if (vcf['calldata/AD'][i,0,0])/(vcf['calldata/DP'][i,0]) < 0.5: # Checks that variant is a minority variant
+            elif genome.seq[(pos-1)].upper() == 'N' or genome.seq[(pos-1)] == '-':
+                print(genome.id)
+                print(pos)
+                if (vcf['calldata/AD'][i,0,0])/(cov) < 0.5: # Checks that variant is a minority variant
                     mapping['position'].append(pos)
-                    mapping['variant'].append(vcf['variants/ALT'][i,0])
-                    mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
-                    mapping['frequency'].append(float(vcf['calldata/AD'][i,0,0]/vcf['calldata/DP'][i,0]))
-                elif (vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01: # Checks that reference variant meets cutoff
+                    mapping['variant'].append(alt)
+                    mapping['coverage'].append(cov)
+                    mapping['frequency'].append(float(vcf['calldata/AD'][i,0,0]/cov))
+                    mapping['consensus'].append(ref)
+                    mapping['reads'].append(int(vcf['calldata/AD'][i,0,0]))
+                    mapping['type'].append('Alternate')
+
+                elif (vcf['calldata/RD'][i,0])/(cov) >= 0.01: # Checks that reference variant meets cutoff
                     mapping['position'].append(pos)
-                    mapping['variant'].append(vcf['variants/REF'][i])
-                    mapping['coverage'].append(int(vcf['calldata/DP'][i,0]))
-                    mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/vcf['calldata/DP'][i,0]))
+                    mapping['variant'].append(ref)
+                    mapping['coverage'].append(cov)
+                    mapping['frequency'].append(float(vcf['calldata/RD'][i,0]/cov))
+                    mapping['consensus'].append(alt)
+                    mapping['reads'].append(int(vcf['calldata/RD'][i,0]))
+                    mapping['type'].append('Reference')
+
 
             else:
                 if ((vcf['calldata/AD'][i,0,0])/(vcf['calldata/DP'][i,0]) >= 0.01 and 0.1 <= vcf['calldata/ADF'][i,0]/vcf['calldata/AD'][i,0,0] <= 0.9) or ((vcf['calldata/RD'][i,0])/(vcf['calldata/DP'][i,0]) >= 0.01 and 0.1 <= vcf['calldata/RDF'][i,0]/vcf['calldata/RD'][i,0] <= 0.9):
                     print('\nCheck ' + file + ' Genome does not match reference or variant.')
                     print('Strain: ' + ref)
                     print('Position: ' + str(pos))
-                    print('Genome: '+ genomes[ref].seq[pos-1]).upper()
+                    print('Genome: '+ genome.seq[pos-1]).upper()
                     print('Ref: ' + vcf['variants/REF'][i])
                     print('Alt: ' + vcf['variants/ALT'][i,0])
     return mapping
 
-def create_snvs(mfile, vcfs, genomes):
+def create_snvs(mfile, vcfs, directory):
     '''
     Creates dictionary containing SNVs for each vcf file.
     '''
@@ -110,9 +133,11 @@ def create_snvs(mfile, vcfs, genomes):
         id = row['id']
         file = [path for path in vcfs if id in path]
         if len(file) > 0:
-            reference = row['reference']
+            consensus_path = directory + '/' + id + '.fasta'
+            with open(consensus_path, 'r') as f:
+                genome = list(SeqIO.parse(f, 'fasta'))[0]
             snvs[id] = {}
-            snvs[id] = check_variants(file[0], reference, genomes)
+            snvs[id] = check_variants(file[0], genome)
     return snvs
 
 def add_total(snvs):
@@ -130,17 +155,17 @@ if __name__ == '__main__':
     )
 
     parser.add_argument('--metadata', type=str, required=True, help='tsv with sample names and ref')
-    parser.add_argument('--sequences', type=str, required=True, help = 'fasta file of consensus genomes')
+    parser.add_argument('--sequences', type=str, required=True, help = 'directory of consensus genomes')
     parser.add_argument('--vcf', nargs = '+', type=str, required=True, help = 'list of vcf files')
     parser.add_argument('--output', type=str, required=True, help = 'location of output json')
     args = parser.parse_args()
 
     # Loads dictionary of consensus genomes
-    genomes = load_genomes(args.sequences)
+    #genomes = load_genomes(args.sequences)
     #check_genomes(genomes, args.metadata)
 
     # Makes dictionary of iSNVs
-    snvs = create_snvs(args.metadata, args.vcf, genomes)
+    snvs = create_snvs(args.metadata, args.vcf, args.sequences)
 
     # Adds entry to iSNVs dictionary
     snvs_dict = add_total(snvs)

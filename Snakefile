@@ -172,8 +172,8 @@ rule get_indels:
 rule validate_snvs:
     message: 'Generating iSNVs for each sample'
     input:
-        metadata = rules.concat_metadata.output.metadata,
-        sequences = rules.filter.output.sequences,
+        metadata = 'results/metadata.tsv',
+        sequences = '/fh/scratch/delete10/bedford_t/ncov-consensus/',
         vcfs = expand('results/vcf_snvs/{sample}.vcf', sample=config['samples'])
     output:
         snvs = 'results/snvs.json'

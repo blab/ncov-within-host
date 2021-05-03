@@ -90,9 +90,7 @@ def check_variants(file, genome):
                     mapping['reads'].append(int(vcf['calldata/RD'][i,0]))
                     mapping['type'].append('Reference')
 
-            elif genome.seq[(pos-1)].upper() == 'N' or genome.seq[(pos-1)] == '-':
-                print(genome.id)
-                print(pos)
+            elif genome.seq[(pos-1)].upper() == 'N' or genome.seq[(pos-1)] == '-': # Most of these consensus genomes had an N if the variant was mostly on one strand. This behavior was not changed untl 01/15/21 rerunned batches.
                 if (vcf['calldata/AD'][i,0,0])/(cov) < 0.5: # Checks that variant is a minority variant
                     mapping['position'].append(pos)
                     mapping['variant'].append(alt)

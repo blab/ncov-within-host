@@ -32,7 +32,7 @@ def find_duplicates(a):
             seen[x] += 1
     return dupes
 
-def map_replicates(columns, df):
+def map_replicates(columns, df, exclude):
     '''
     Generates tsv with mapping of id for each replicate pair.
     '''
@@ -55,6 +55,7 @@ def map_replicates(columns, df):
     reps['id2'] = id2
     reps['matching_variable'] = matching_c
     reps['matching_identifier'] = matching_i
+    reps = reps[~reps.matching_identifier.isin(exclude)]
     dedup = reps.drop_duplicates(subset = ['id1', 'id2'])
     dedup['replicate_no'] = range(1, len(dedup) + 1)
     return dedup
@@ -67,6 +68,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--metadata', type=str, required=True, help='tsv file containing metadata')
     parser.add_argument('--match-on', nargs = '+', type=str, required=True, help = 'List of column names to match on')
+    parser.add_argument('--exclude', nargs='+', type=str, default='[]', help= 'List of identifiers to exclude')
     parser.add_argument('--output', type=str, required=True, help = 'location of output tsv')
     args = parser.parse_args()
 
@@ -74,7 +76,7 @@ if __name__ == '__main__':
     metadata = load_df(args.metadata)
 
     # Generate replicate pairs
-    replicates = map_replicates(args.match_on, metadata)
+    replicates = map_replicates(args.match_on, metadata, args.exclude)
 
     # Write out tsv
     with open(args.output, 'w') as f:

@@ -64,9 +64,9 @@ def compare_frequencies(vDF, rDF, pileups):
     reads2 = []
     for s1, s2, num in zip(rDF['id1'], rDF['id2'], rDF['replicate_no']):
         ct = vDF.loc[vDF.id == s1, 'avg_ct'].unique()[0]
-        with open(pileups + s1 + '.pileup') as tfile:
+        with open(pileups + '/' + s1 + '.pileup') as tfile:
             p1 = pd.read_csv(tfile, sep = '\t', header=None, nrows=29903)
-        with open(pileups + s2 + '.pileup') as tfile:
+        with open(pileups + '/' + s2 + '.pileup') as tfile:
             p2 = pd.read_csv(tfile, sep = '\t', header=None, nrows=29903)
         snvs1 = vDF.loc[vDF.id == s1, 'snv']
         snvs2 = vDF.loc[vDF.id == s2, 'snv']

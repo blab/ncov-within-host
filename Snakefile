@@ -215,7 +215,8 @@ rule find_replicates:
     input:
         metadata = 'results/metadata.tsv'
     params:
-        match_on = ['nwgc_id', 'phl_accession', 'sample_barcode', 'strain']
+        match_on = ['nwgc_id', 'phl_accession', 'sample_barcode', 'strain'],
+        exclude = ['385186', '492858', '492875', '497158', '501520', '502327', '505218']
     output:
         replicates = 'results/replicates/replicate_mapping.tsv'
     conda: 'config/within-host.yaml'
@@ -224,6 +225,7 @@ rule find_replicates:
         python scripts/find_replicates.py \
         --metadata {input.metadata} \
         --match-on {params.match_on} \
+        --exclude {params.exclude} \
         --output {output.replicates}
         '''
 
@@ -250,7 +252,8 @@ rule compare_replicates:
         replicates = 'results/replicates/replicate_mapping.tsv',
         pileups = '/fh/scratch/delete10/bedford_t/ncov_pileups/'
     output:
-        directory = 'results/replicates/'
+        directory = 'results/replicates/',
+        tsv = 'results/replicates/variant_frequencies.tsv'
     conda: 'config/within-host.yaml'
     shell:
         '''
